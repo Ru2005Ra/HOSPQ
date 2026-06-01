@@ -1,0 +1,15 @@
+
+> dev
+> vite dev
+
+Port 8080 is in use, trying another one...
+
+  [32m[1mVITE[22m v7.3.3[39m  [2mready in [0m[1m225019[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m8081[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://10.13.81.146:[1m8081[22m/[39m
+[2m9:54:08 AM[22m [36m[1m[vite][22m[39m [32mvite.config.ts changed, restarting server...[39m
+[2m10:29:46 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m Re-optimizing dependencies because vite config has changed
+[2m10:30:02 AM[22m [36m[1m[vite][22m[39m server restarted.
+
+c:\Users\GS Bumba\www>
