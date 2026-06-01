@@ -273,12 +273,18 @@ function FirstAidTips() {
 
 function VisitStagesTable({ ticket }: { ticket: QueueTicket }) {
   const stages = [
+    // Reception is considered done once the patient leaves the waiting queue.
     { name: "Reception", desc: "Registration, vitals & insurance", done: ticket.status !== "waiting", active: ticket.status === "waiting" },
-    { name: "Doctor", desc: "Consultation & diagnosis", done: ["paying","pharmacy","done"].includes(ticket.status), active: ticket.status === "with-doctor" },
-    { name: "Laboratory", desc: "Lab tests (if required)", done: ["pharmacy","done"].includes(ticket.status), active: false },
-    { name: "Payment", desc: "Pay at cashier", done: ["pharmacy","done"].includes(ticket.status), active: ticket.status === "paying" },
+    // Doctor is active during consultation.
+    { name: "Doctor", desc: "Consultation & diagnosis", done: ["paying", "pharmacy", "done"].includes(ticket.status), active: ticket.status === "with-doctor" },
+    // Laboratory isn't a real status in the queue right now, so we mark it as:
+    // - pending while waiting/with-doctor
+    // - done once the workflow reaches payment or beyond.
+    { name: "Laboratory", desc: "Lab tests (if required)", done: ["paying", "pharmacy", "done"].includes(ticket.status), active: false },
+    { name: "Payment", desc: "Pay at cashier", done: ["pharmacy", "done"].includes(ticket.status), active: ticket.status === "paying" },
     { name: "Pharmacy", desc: "Collect medicines", done: ticket.status === "done", active: ticket.status === "pharmacy" },
   ];
+
 
   return (
     <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)] overflow-hidden">
