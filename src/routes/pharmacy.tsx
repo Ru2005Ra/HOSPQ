@@ -44,10 +44,40 @@ function Page() {
 function DispenseTab() {
   const tr = useT();
   const queue = useDb((d) => d.queue?.filter((t: any) => t.status === "pharmacy") ?? []);
+  const exportPdf = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text("HospiQ — Pharmacy awaiting dispense report", 14, 18);
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 26);
+    autoTable(doc, {
+      startY: 32,
+      head: [["Token", "Patient", "Phone", "Prescription", "Paid (RWF)", "Dispensed At", "Created At"]],
+      body: queue.map((t: any) => {
+        const u = (db.all().users.find((u: any) => u.id === t.patientId) || {}) as any;
+        const phone = u.phone || "";
+        const pres = (t.prescription ?? []).map((p: any) => `${p.name} x${p.qty}`).join(" | ");
+        return [
+          t.token,
+          t.patientName,
+          phone,
+          pres,
+          (t.paidAmount ?? 0).toLocaleString(),
+          t.dispensedAt ? new Date(t.dispensedAt).toLocaleString() : "",
+          new Date(t.createdAt).toLocaleString(),
+        ];
+      }),
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [15, 27, 61] },
+    });
+    doc.save(`pharmacy-report-${new Date().toISOString().slice(0,10)}.pdf`);
+    toast.success(tr('report_exported'));
+  };
+
   return (
     <div className="grid gap-4">
-      <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-700">
-        ℹ️ Only patients who have <strong>already paid</strong> appear here. Payment is done by the patient on their dashboard before arriving at this counter.
+      <div className="flex items-center justify-end">
+        <Button onClick={exportPdf} className="bg-accent text-accent-foreground hover:bg-accent/90"><Download className="mr-2 h-4 w-4" /> {tr('export_report')}</Button>
       </div>
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
         <table className="w-full text-sm">

@@ -53,6 +53,7 @@ export interface RequestedLabTest {
   testId: string;
   name: string;
   status: "requested" | "done";
+  result?: string;
 }
 
 export interface QueueTicket {
@@ -64,6 +65,8 @@ export interface QueueTicket {
   token: string;
   department: string;
   departmentCode: string;
+  readyForDoctor?: boolean;
+  room?: string;
   createdAt: number;
   status: "waiting" | "with-doctor" | "paying" | "pharmacy" | "done" | "removed";
 
@@ -76,8 +79,12 @@ export interface QueueTicket {
   doctorNote?: string;
   paid?: boolean;
   paidAmount?: number;
+  // Mobile payment request (for MTN/Airtel integration or mock)
+  paymentRequest?: { requestId: string; phone: string; amount: number; provider?: string; status: "pending" | "success" | "failed"; createdAt: number };
   dispensedAt?: number;
   labRequestedTests?: RequestedLabTest[];
+  previousDepartmentCode?: string;
+  previousDepartment?: string;
 }
 
 
@@ -292,8 +299,10 @@ export const db = {
       token,
       department: dept.name,
       departmentCode: dept.code,
+      room: dept.room,
       createdAt: Date.now(),
       status: "waiting",
+      readyForDoctor: false,
     };
     d.queue.push(ticket);
     if (patient.insurance !== insurance) {
@@ -315,7 +324,7 @@ export const db = {
     const d = read();
 
     const next = d.queue
-      .filter(t => t.status === "waiting" && t.departmentCode !== "LB")
+      .filter(t => t.status === "waiting" && t.readyForDoctor && t.departmentCode !== "LB")
       .sort((a, b) => a.createdAt - b.createdAt)[0];
 
     if (!next) return null;
@@ -365,13 +374,30 @@ export const db = {
       })
       .filter(Boolean) as RequestedLabTest[];
 
+    if (requested.length === 0) return;
+
+    if (t.departmentCode !== "LB") {
+      t.previousDepartmentCode = t.departmentCode;
+      t.previousDepartment = t.department;
+    }
+
     t.labRequestedTests = requested;
     t.departmentCode = "LB";
     t.department = "Laboratory";
     t.status = "waiting";
+    t.readyForDoctor = false;
     write(d);
   },
 
+  markReceptionPassed(ticketId: string) {
+    const d = read();
+    const t = d.queue.find(x => x.id === ticketId);
+    if (t) {
+      if (!t.room) t.room = DEPARTMENTS.find(x => x.code === t.departmentCode)?.room ?? "Consultation room";
+      t.readyForDoctor = true;
+    }
+    write(d);
+  },
   removeTicket(ticketId: string) {
     const d = read();
     const t = d.queue.find(x => x.id === ticketId);
@@ -433,6 +459,27 @@ export const db = {
     t.diagnosis = description;
     write(d);
   },
+  recordLabResults(ticketId: string, results: Record<string, string>) {
+    const d = read();
+    const t = d.queue.find(x => x.id === ticketId);
+    if (!t || !t.labRequestedTests?.length) return;
+
+    t.labRequestedTests = t.labRequestedTests.map(x => ({
+      ...x,
+      result: results[x.testId] ?? x.result,
+    }));
+
+    t.status = "with-doctor";
+    if (t.previousDepartmentCode) {
+      t.departmentCode = t.previousDepartmentCode;
+      t.department = t.previousDepartment ?? t.department;
+      t.room = DEPARTMENTS.find(dpt => dpt.code === t.previousDepartmentCode)?.room ?? t.room;
+    }
+    t.previousDepartmentCode = undefined;
+    t.previousDepartment = undefined;
+    write(d);
+  },
+
   completeLabTicket(ticketId: string) {
     const d = read();
     const t = d.queue.find(x => x.id === ticketId);
@@ -464,6 +511,39 @@ export const db = {
     t.paidAmount = amount;
     t.status = "pharmacy";
     write(d);
+  },
+  // Create a mobile money payment request. In a production system this would
+  // call a backend which integrates with MTN/Airtel APIs and webhooks. For the
+  // demo/local app we create a pending request and let `verifyPayment` mark it.
+  createPaymentRequest(ticketId: string, phone: string, amount: number, provider: string = "mock") {
+    const d = read();
+    const t = d.queue.find(x => x.id === ticketId);
+    if (!t) return null;
+    const reqId = uid();
+    t.paymentRequest = { requestId: reqId, phone, amount, provider, status: "pending", createdAt: Date.now() };
+    write(d);
+    return reqId;
+  },
+
+  // Verify a mobile money payment request. For demo purposes the verification
+  // logic is deterministic: if the last digit of the phone number is even,
+  // treat the payment as successful; otherwise fail. Replace this with a real
+  // verification step (provider API / webhook) in production.
+  verifyPayment(requestId: string) {
+    const d = read();
+    const t = d.queue.find(x => x.paymentRequest?.requestId === requestId);
+    if (!t || !t.paymentRequest) return { ok: false };
+    const phone = t.paymentRequest.phone.replace(/\D/g, "");
+    const last = phone.length ? +phone[phone.length - 1] : 1;
+    const success = last % 2 === 0;
+    t.paymentRequest.status = success ? "success" : "failed";
+    if (success) {
+      t.paid = true;
+      t.paidAmount = t.paymentRequest.amount;
+      t.status = "pharmacy";
+    }
+    write(d);
+    return { ok: success, ticketId: t.id };
   },
   dispense(ticketId: string) {
     const d = read();

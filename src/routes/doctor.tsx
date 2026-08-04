@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useDb } from "@/lib/hooks";
+import { useAuth, useDb } from "@/lib/hooks";
 import { db } from "@/lib/store";
 import { Trash2 } from "lucide-react";
 import { useT } from "@/lib/i18n";
@@ -21,23 +21,36 @@ interface Line { medicineId?: string; name: string; qty: number; price: number; 
 
 function Page() {
   const tr = useT();
+  const { user } = useAuth();
   const current = useDb((d) => d.queue?.find((t: any) => t.status === "with-doctor") ?? null);
   const meds = useDb((d) => d.medicines ?? []);
   const waiting = useDb((d) => d.queue?.filter((t: any) => t.status === "waiting").length ?? 0);
+  const readyForDoctor = useDb((d) => d.queue?.filter((t: any) => t.status === "waiting" && t.readyForDoctor && t.departmentCode !== "LB").length ?? 0);
+  const waitingReception = Math.max(0, waiting - readyForDoctor);
+  const labCatalog = useDb((d) => d.labTests ?? []);
+  const labResultsForDoctor = useDb((d) => {
+    if (!user) return [];
+    return d.queue?.filter((t: any) =>
+      t.assignedDoctorId === user.id &&
+      t.labRequestedTests?.some((lab: any) => lab.result) &&
+      t.status !== "removed"
+    ) ?? [];
+  });
   const [diagnosis, setDiagnosis] = useState("");
   const [note, setNote] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
   const [selectedTests, setSelectedTests] = useState<string[]>([]);
-  const labCatalog = useDb((d) => d.labTests ?? []);
-
+  const currentHasReturnedLabResults = current?.labRequestedTests?.some((lab: any) => !!lab.result) ?? false;
 
   const reset = () => { setDiagnosis(""); setNote(""); setLines([]); };
 
   const callNext = () => {
     const t = db.callNext();
-    if (!t) return toast.info(tr("queue_empty"));
+    if (!t) {
+      return toast.info(readyForDoctor === 0 ? tr("no_ready_patients") : tr("queue_empty"));
+    }
     reset();
-    toast.success(`${tr("calling")} ${t.patientName} (#${t.token})`);
+    toast.success(`${tr("calling")} ${t.patientName} (#${t.token}) — ${t.room ?? tr("unknown_room")}`);
   };
 
   const addLine = (id: string) => {
@@ -54,11 +67,35 @@ function Page() {
     reset();
   };
 
+  const toggleTest = (testId: string) => {
+    setSelectedTests((prev) =>
+      prev.includes(testId) ? prev.filter((id) => id !== testId) : [...prev, testId]
+    );
+  };
+
   const sendToLab = () => {
     if (!current) return;
-    db.sendToLab(current.id);
+    if (selectedTests.length === 0) return toast.error(tr("select_lab_tests"));
+    db.sendToLab(current.id, selectedTests.map((testId) => ({ testId })));
     toast.success(tr("sent_to_lab"));
     reset();
+    setSelectedTests([]);
+  };
+
+  const renderLabResults = (ticket: any) => {
+    if (!ticket.labRequestedTests?.length) return null;
+    return (
+      <div className="mt-4 rounded-xl border border-border bg-secondary p-4 text-sm">
+        <h3 className="font-semibold text-foreground">{tr("lab_results")}</h3>
+        <ul className="mt-3 space-y-2 text-xs text-muted-foreground">
+          {ticket.labRequestedTests.map((lab: any) => (
+            <li key={lab.testId}>
+              <span className="font-semibold text-foreground">{lab.name}:</span> {lab.result ? lab.result : tr("no_lab_results")}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
   };
 
   return (
@@ -69,8 +106,11 @@ function Page() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">{tr("doctor_title")}</h1>
             <p className="mt-2 text-muted-foreground">{waiting} {waiting === 1 ? tr("patient_waiting") : tr("patients_waiting")}</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {readyForDoctor} {readyForDoctor === 1 ? tr("ready_patient") : tr("ready_patients")} · {waitingReception} {waitingReception === 1 ? tr("waiting_reception_patient") : tr("waiting_reception_patients")}
+            </p>
           </div>
-          <Button onClick={callNext} className="bg-accent text-accent-foreground hover:bg-accent/90" disabled={!!current}>{tr("call_next")}</Button>
+          <Button onClick={callNext} className="bg-accent text-accent-foreground hover:bg-accent/90" disabled={!!current || readyForDoctor === 0}>{tr("call_next")}</Button>
         </div>
 
         {!current && (
@@ -85,11 +125,19 @@ function Page() {
               <div className="rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
                 <h2 className="text-xl font-semibold text-foreground">{current.patientName} <span className="ml-2 rounded-full bg-primary px-3 py-1 text-sm text-primary-foreground">#{current.token}</span></h2>
                 <p className="text-xs text-muted-foreground">{tr("insurance_col")}: {current.insurance}</p>
+                <p className="text-xs text-muted-foreground">{tr("room")} {current.room ?? tr("unknown_room")}</p>
+                {currentHasReturnedLabResults && (
+                  <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+                    <p className="font-semibold">{tr("lab_results_returned")}</p>
+                    <p className="text-xs text-muted-foreground">{tr("lab_results_returned_hint")}</p>
+                  </div>
+                )}
                 <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
                   <Vital label={tr("weight")} value={`${current.vitals.weight} kg`} />
                   <Vital label={tr("temp")} value={`${current.vitals.temperature} °C`} />
                   <Vital label={tr("bp")} value={current.vitals.bloodPressure || "—"} />
                 </div>
+                {renderLabResults(current)}
               </div>
 
               <div className="rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
@@ -97,6 +145,27 @@ function Page() {
                 <Textarea value={diagnosis} onChange={e => setDiagnosis(e.target.value)} className="mt-1" rows={3} />
                 <Label className="mt-4 block">{tr("doctor_note")}</Label>
                 <Textarea value={note} onChange={e => setNote(e.target.value)} className="mt-1" rows={2} />
+              </div>
+
+              <div className="rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+                <h3 className="text-lg font-semibold text-foreground">{tr("lab_tests")}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{tr("request_lab_tests")}</p>
+                <div className="mt-4 grid gap-2">
+                  {labCatalog.map((test) => (
+                    <label key={test.id} className="inline-flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selectedTests.includes(test.id)}
+                        onChange={() => toggleTest(test.id)}
+                        className="h-4 w-4 rounded border-input text-accent focus:ring-accent"
+                      />
+                      <div>
+                        <div className="font-semibold text-foreground">{test.name}</div>
+                        <div className="text-xs text-muted-foreground">{test.description}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
               </div>
 
               <div className="rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
@@ -122,7 +191,7 @@ function Page() {
 
               <div className="flex gap-3">
                 <Button onClick={submit} size="lg" className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90">{tr("submit_patient")}</Button>
-                <Button onClick={sendToLab} size="lg" variant="outline" className="border-blue-500 text-blue-600 hover:bg-blue-50">{tr("send_to_lab")}</Button>
+                <Button onClick={sendToLab} size="lg" variant="outline" className="border-blue-500 text-blue-600 hover:bg-blue-50" disabled={selectedTests.length === 0}>{tr("send_to_lab")}</Button>
               </div>
             </div>
 
@@ -137,6 +206,26 @@ function Page() {
                 ))}
               </ul>
             </aside>
+
+            {labResultsForDoctor.length > 0 && (
+              <aside className="rounded-xl border border-border bg-card p-5 text-sm">
+                <h3 className="font-semibold text-foreground">{tr("lab_results")}</h3>
+                <div className="mt-3 space-y-4">
+                  {labResultsForDoctor.map((ticket: any) => (
+                    <div key={ticket.id} className="rounded-xl border border-border bg-secondary p-4">
+                      <p className="font-semibold text-foreground">{ticket.patientName} — #{ticket.token}</p>
+                      <ul className="mt-2 space-y-2 text-xs text-muted-foreground">
+                        {ticket.labRequestedTests?.map((lab: any) => (
+                          <li key={lab.testId}>
+                            <span className="font-semibold text-foreground">{lab.name}:</span> {lab.result ?? tr("no_lab_results")}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </aside>
+            )}
           </div>
         )}
       </main>

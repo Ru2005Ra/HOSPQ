@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { Header } from "@/components/Header";
 import { RoleGuard } from "@/components/RoleGuard";
 import { Button } from "@/components/ui/button";
@@ -16,7 +18,9 @@ export const Route = createFileRoute("/reception")({
 function Page() {
   const tr = useT();
   const queue = useDb((d) => d.queue ?? []);
-  const waiting = queue.filter((t: any) => t.status === "waiting");
+  // Exclude laboratory tickets from the reception waiting list so lab items
+  // don't appear on the reception dashboard.
+  const waiting = queue.filter((t: any) => t.status === "waiting" && t.departmentCode !== "LB");
   const today = queue.filter((t: any) => t.createdAt > Date.now() - 24 * 3600 * 1000);
   const [modal, setModal] = useState<{ patientId: string; ticketId: string } | null>(null);
   const [emergency, setEmergency] = useState<{ ticketId: string; description: string } | null>(null);
@@ -38,6 +42,47 @@ function Page() {
     return `W: ${t.vitals.weight}kg, T: ${t.vitals.temperature}°C, BP: ${t.vitals.bloodPressure}`;
   };
 
+  const exportReport = () => {
+    const all = db.all();
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text("HospiQ — Reception queue report", 14, 18);
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 26);
+    autoTable(doc, {
+      startY: 32,
+      head: [["Token", "Patient", "Phone", "Department", "Room", "Weight", "Temperature", "BP", "Insurance", "Location", "Status", "Created At"]],
+      body: (all.queue || []).map((t: any) => {
+        const user = all.users.find((u: any) => u.id === t.patientId) || {};
+        const phone = user.phone || "";
+        const location = user.province ? `${user.province} | ${user.district} | ${user.sector} | ${user.village}` : "";
+        return [
+          t.token,
+          t.patientName,
+          phone,
+          t.department,
+          t.room || "",
+          t.vitals?.weight || "",
+          t.vitals?.temperature || "",
+          t.vitals?.bloodPressure || "",
+          user.insurance || "",
+          location,
+          t.status,
+          new Date(t.createdAt).toISOString(),
+        ];
+      }),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [15, 27, 61] },
+      columnStyles: {
+        3: { cellWidth: 30 },
+        9: { cellWidth: 35 },
+      },
+    });
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    doc.save(`reception_report_${ts}.pdf`);
+    toast.success(tr('report_exported'));
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -51,6 +96,10 @@ function Page() {
           <Stat label={tr("today_total")} value={today.length} />
         </div>
 
+        <div className="mt-4 flex justify-end">
+          <Button onClick={exportReport}>{tr("export_report")}</Button>
+        </div>
+
         <h2 className="mt-10 text-lg font-semibold text-foreground">{tr("waiting_list")}</h2>
         <div className="mt-3 overflow-x-auto rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
           <table className="w-full text-sm">
@@ -61,12 +110,14 @@ function Page() {
                 <th className="p-3">{tr("department")}</th>
                 <th className="p-3">{tr("location_col")}</th>
                 <th className="p-3">{tr("insurance_col")}</th>
+                <th className="p-3">{tr("room_col")}</th>
                 <th className="p-3">{tr("vitals_col")}</th>
+                <th className="p-3">{tr("reception_status_col")}</th>
                 <th className="p-3">{tr("actions_col")}</th>
               </tr>
             </thead>
             <tbody>
-              {waiting.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">{tr("no_waiting")}</td></tr>}
+              {waiting.length === 0 && <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">{tr("no_waiting")}</td></tr>}
               {waiting.map((t: any) => (
                 <tr key={t.id} className="border-t border-border">
                   <td className="p-3 font-semibold text-primary">#{t.token}</td>
@@ -74,10 +125,13 @@ function Page() {
                   <td className="p-3 text-muted-foreground">{t.department}</td>
                   <td className="p-3 text-muted-foreground text-xs">{locationFor(t.patientId)}</td>
                   <td className="p-3 text-muted-foreground text-xs">{insuranceFor(t.patientId)}</td>
+                  <td className="p-3 text-muted-foreground text-xs">{t.room ?? tr("pending_room")}</td>
                   <td className="p-3 text-muted-foreground text-xs">{vitalsFor(t.id)}</td>
+                  <td className="p-3 text-muted-foreground text-xs">{t.readyForDoctor ? tr("ready_for_doctor") : tr("waiting_reception")}</td>
                   <td className="p-3 text-right space-x-2">
                     <Button size="sm" variant="outline" onClick={() => setModal({ patientId: t.patientId, ticketId: t.id })}>{tr("edit_info")}</Button>
                     <Button size="sm" variant="outline" onClick={() => setEmergency({ ticketId: t.id, description: "" })}>{tr("triage")}</Button>
+                    <Button size="sm" variant="outline" onClick={() => { db.markReceptionPassed(t.id); toast.success(tr("reception_passed")); }} disabled={t.readyForDoctor}>{t.readyForDoctor ? tr("ready_for_doctor") : tr("pass_to_doctor")}</Button>
                     <Button size="sm" variant="outline" onClick={() => { db.removeTicket(t.id); toast.success(tr("token_removed")); }}>{tr("remove")}</Button>
                   </td>
                 </tr>
@@ -102,14 +156,31 @@ function EditModal({ patientId, ticketId, onClose }: { patientId: string; ticket
   const [sector, setSector] = useState(patient?.sector || "");
   const [village, setVillage] = useState(patient?.village || "");
   const [insurance, setInsurance] = useState(patient?.insurance || "");
+  const [room, setRoom] = useState(ticket?.room || "");
   const [weight, setWeight] = useState(ticket?.vitals.weight || "");
   const [temperature, setTemperature] = useState(ticket?.vitals.temperature || "");
   const [bloodPressure, setBloodPressure] = useState(ticket?.vitals.bloodPressure || "");
 
   const save = () => {
+    const weightNum = parseFloat(weight);
+    const tempNum = parseFloat(temperature);
+    const bpMatch = bloodPressure.trim().match(/^(\d{2,3})\/(\d{2,3})$/);
+
+    if (!weight) return toast.error(tr("weight_required"));
+    if (Number.isNaN(weightNum) || weightNum < 20 || weightNum > 200) return toast.error(tr("weight_invalid"));
+    if (!temperature) return toast.error(tr("temperature_required"));
+    if (Number.isNaN(tempNum) || tempNum < 34 || tempNum > 42) return toast.error(tr("temperature_invalid"));
+    if (!bloodPressure) return toast.error(tr("bp_required"));
+    if (!bpMatch) return toast.error(tr("bp_invalid_format"));
+    const systolic = Number(bpMatch[1]);
+    const diastolic = Number(bpMatch[2]);
+    if (systolic < 80 || systolic > 180 || diastolic < 40 || diastolic > 120) return toast.error(tr("bp_invalid_value"));
     db.updatePatientLocation(patientId, { province, district, sector, village });
     if (insurance) { const u = db.all().users.find((x: any) => x.id === patientId); if (u) u.insurance = insurance; }
-    if (ticket) ticket.vitals = { weight, temperature, bloodPressure };
+    if (ticket) {
+      ticket.vitals = { weight, temperature, bloodPressure };
+      ticket.room = room;
+    }
     toast.success(tr("patient_updated"));
     onClose();
   };
@@ -125,6 +196,7 @@ function EditModal({ patientId, ticketId, onClose }: { patientId: string; ticket
           <input className={cls} placeholder={tr("sector")} value={sector} onChange={e => setSector(e.target.value)} />
           <input className={cls} placeholder={tr("village")} value={village} onChange={e => setVillage(e.target.value)} />
           <input className={cls} placeholder={tr("insurance_col")} value={insurance} onChange={e => setInsurance(e.target.value)} />
+          <input className={cls} placeholder={tr("room")} value={room} onChange={e => setRoom(e.target.value)} />
           <input className={cls} placeholder={tr("weight")} value={weight} onChange={e => setWeight(e.target.value)} />
           <input className={cls} placeholder={tr("temp")} value={temperature} onChange={e => setTemperature(e.target.value)} />
           <input className={cls} placeholder={tr("bp")} value={bloodPressure} onChange={e => setBloodPressure(e.target.value)} />

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -40,22 +41,37 @@ function PatientHome() {
   const tr = useT();
   const ticket = useDb((d) => (user ? d.queue?.find((t: any) => t.patientId === user.id && t.status !== "done" && t.status !== "removed") ?? null : null));
   const [lastStatus, setLastStatus] = useState<string | null>(null);
+  const [lastDept, setLastDept] = useState<string | null>(null);
 
   useEffect(() => {
     if (ready && (!user || user.role !== "patient")) navigate({ to: "/auth" });
   }, [ready, user, navigate]);
 
   useEffect(() => {
-    if (!ticket) { setLastStatus(null); return; }
-    if (ticket.status === lastStatus) return;
-    setLastStatus(ticket.status);
-    const room = DEPARTMENTS.find(d => d.code === ticket.departmentCode)?.room ?? "consultation room";
+    if (!ticket) { setLastStatus(null); setLastDept(null); return; }
+    if (ticket.status === lastStatus && ticket.departmentCode === lastDept) return;
+
+    const room = ticket.room ?? DEPARTMENTS.find(d => d.code === ticket.departmentCode)?.room ?? "consultation room";
+
+    // Emergency was just assigned
+    if (ticket.departmentCode === "MH" && ticket.status !== "done" && lastDept !== "MH") {
+      toast.error(`🚨 ${tr("emergency_alert_active")} ${room}`);
+    }
+
+    // Emergency previously active but now resolved
+    if (lastDept === "MH" && ticket.status === "done") {
+      toast.success(tr("emergency_alert_resolved"));
+    }
+
     if (ticket.status === "waiting") toast(`✅ Token ${ticket.token} ready — head to reception desk.`);
     if (ticket.status === "with-doctor") toast(`🩺 Doctor is ready. Please go to ${room}.`);
     if (ticket.status === "paying") toast(`💳 Consultation done. Please pay at the cashier.`);
     if (ticket.status === "pharmacy") toast(`💊 Go to pharmacy to collect your medicines.`);
     if (ticket.status === "done") toast(`🎉 Visit complete. Thank you for using HospiQ!`);
-  }, [ticket, lastStatus]);
+
+    setLastStatus(ticket.status);
+    setLastDept(ticket.departmentCode);
+  }, [ticket, lastStatus, lastDept, tr]);
 
   if (!user || user.role !== "patient") return null;
 
@@ -65,6 +81,20 @@ function PatientHome() {
       <main className="mx-auto max-w-3xl px-4 py-10">
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{tr("hi")} {user.firstName} 👋</h1>
         <p className="mt-2 text-muted-foreground">{tr("manage_visit")}</p>
+
+        {ticket && ticket.departmentCode === "MH" && ticket.status !== "done" && (
+          <div className="mt-4 rounded-xl border border-destructive bg-red-50 p-4 text-sm text-destructive">
+            <strong>{tr("emergency_alert_active")}</strong>
+            <p className="mt-1 text-xs text-muted-foreground">{tr("go_to_room")} {ticket.room ?? DEPARTMENTS.find(d => d.code === ticket.departmentCode)?.room}</p>
+          </div>
+        )}
+
+        {ticket && lastDept === "MH" && ticket.status === "done" && (
+          <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+            <strong>{tr("emergency_alert_resolved")}</strong>
+          </div>
+        )}
+
         {!ticket && <StartVisit />}
         {ticket && <ActiveVisit ticket={ticket} />}
       </main>
@@ -151,9 +181,6 @@ function StartVisit() {
           {INSURERS.map(i => <option key={i}>{i}</option>)}
         </select>
       </div>
-      <p className="rounded-md bg-blue-50 border border-blue-200 p-3 text-xs text-blue-700">
-        ℹ️ Vitals (weight, temperature, blood pressure) will be measured by reception when you arrive at the desk.
-      </p>
       <div className="flex gap-3">
         <Button type="button" variant="outline" onClick={() => setStep("location")}>{tr("cancel")}</Button>
         <Button type="submit" className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90">{tr("get_my_token")}</Button>
@@ -166,8 +193,6 @@ function ActiveVisit({ ticket }: { ticket: QueueTicket }) {
   return (
     <div className="mt-8 grid gap-6">
       <TokenCard ticket={ticket} />
-      <StatusMessage ticket={ticket} />
-      {ticket.status === "waiting" && <FirstAidTips />}
       <VisitStagesTable ticket={ticket} />
       {ticket.status === "paying" && <PaymentPanel ticketId={ticket.id} />}
       {ticket.status === "pharmacy" && <PharmacyPanel ticket={ticket} />}
@@ -195,6 +220,7 @@ function TokenCard({ ticket }: { ticket: QueueTicket }) {
       <p className="text-sm uppercase tracking-wide text-muted-foreground">{tr("your_token")}</p>
       <p className="mt-2 text-7xl font-bold text-primary">#{ticket.token}</p>
       <p className="mt-3 text-sm text-muted-foreground">{tr("dept")} {ticket.department}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{tr("room")} {ticket.room ?? DEPARTMENTS.find(d => d.code === ticket.departmentCode)?.room ?? tr("unknown_room")}</p>
       {ticket.status === "waiting" && (
         <>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -272,15 +298,20 @@ function FirstAidTips() {
 }
 
 function VisitStagesTable({ ticket }: { ticket: QueueTicket }) {
+  const receptionDone = ticket.readyForDoctor || ticket.status !== "waiting";
+  const receptionActive = ticket.status === "waiting" && !ticket.readyForDoctor;
+
+  const isAtLab = ticket.departmentCode === "LB";
+  const labDone = ["paying", "pharmacy", "done"].includes(ticket.status);
+  const labActive = isAtLab && ticket.status === "waiting";
+
   const stages = [
-    // Reception is considered done once the patient leaves the waiting queue.
-    { name: "Reception", desc: "Registration, vitals & insurance", done: ticket.status !== "waiting", active: ticket.status === "waiting" },
-    // Doctor is active during consultation.
-    { name: "Doctor", desc: "Consultation & diagnosis", done: ["paying", "pharmacy", "done"].includes(ticket.status), active: ticket.status === "with-doctor" },
-    // Laboratory isn't a real status in the queue right now, so we mark it as:
-    // - pending while waiting/with-doctor
-    // - done once the workflow reaches payment or beyond.
-    { name: "Laboratory", desc: "Lab tests (if required)", done: ["paying", "pharmacy", "done"].includes(ticket.status), active: false },
+    // Reception is considered done once the patient is marked as readyForDoctor OR leaves the waiting queue.
+    { name: "Reception", desc: "Registration, vitals & insurance", done: receptionDone, active: receptionActive },
+    // Doctor is active during consultation. Done once sent to lab or beyond.
+    { name: "Doctor", desc: "Consultation & diagnosis", done: isAtLab || ["paying", "pharmacy", "done"].includes(ticket.status), active: ticket.status === "with-doctor" },
+    // Laboratory is active when patient is at lab. Done once moved to payment or beyond. Cannot return from lab.
+    { name: "Laboratory", desc: "Lab tests (if required)", done: labDone, active: labActive },
     { name: "Payment", desc: "Pay at cashier", done: ["pharmacy", "done"].includes(ticket.status), active: ticket.status === "paying" },
     { name: "Pharmacy", desc: "Collect medicines", done: ticket.status === "done", active: ticket.status === "pharmacy" },
   ];
@@ -336,17 +367,53 @@ function PaymentPanel({ ticketId }: { ticketId: string }) {
   const ticket = useDb((d) => d.queue?.find((t: any) => t.id === ticketId) ?? null);
   const [phone, setPhone] = useState(user?.phone?.replace("+250", "") ?? "");
   const [confirmed, setConfirmed] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
   if (!ticket) return null;
   const total = (ticket.prescription ?? []).reduce((s: number, p: any) => s + (p.transfer ? 0 : p.price * p.qty), 0);
   const hasTransfer = (ticket.prescription ?? []).some((p: any) => p.transfer);
+  const paymentRequest = ticket.paymentRequest;
+  const isPending = paymentRequest?.status === "pending";
+  const isPaid = ticket.paid || paymentRequest?.status === "success";
+  const isFailed = paymentRequest?.status === "failed";
 
   const pay = (e: React.FormEvent) => {
     e.preventDefault();
-    if (`+250${phone}` !== user?.phone) return toast.error(tr("phone_mismatch"));
-    db.recordPayment(ticketId, total);
-    toast.success("✅ Payment confirmed! Head to the pharmacy counter.");
+    const full = `+250${phone}`;
+    if (full !== user?.phone) return toast.error(tr("phone_mismatch"));
+    const reqId = db.createPaymentRequest(ticketId, full, total, "mock");
+    if (!reqId) return toast.error("Could not create payment request.");
+    toast.info(tr("payment_requested"));
   };
+
+  const checkPayment = () => {
+    if (!ticket?.paymentRequest) return;
+    setVerifying(true);
+    try {
+      const res = db.verifyPayment(ticket.paymentRequest.requestId);
+      if (res?.ok) {
+        toast.success(tr("payment_confirmed"));
+      } else {
+        toast.error(tr("payment_failed"));
+      }
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!paymentRequest || paymentRequest.status !== "pending") return;
+    const interval = window.setInterval(() => {
+      if (!ticket?.paymentRequest || ticket.paymentRequest.status !== "pending") return;
+      const res = db.verifyPayment(ticket.paymentRequest.requestId);
+      if (res?.ok) {
+        toast.success(tr("payment_confirmed"));
+      } else if (res) {
+        toast.error(tr("payment_failed"));
+      }
+    }, 5000);
+    return () => window.clearInterval(interval);
+  }, [paymentRequest?.requestId, paymentRequest?.status, ticket, tr]);
 
   return (
     <div className="grid gap-4">
@@ -386,7 +453,7 @@ function PaymentPanel({ ticketId }: { ticketId: string }) {
         )}
       </div>
 
-      {total > 0 && (
+      {total > 0 && !isPaid && (
         <form onSubmit={pay} className="rounded-xl border-2 border-accent bg-card p-6 shadow-[var(--shadow-card)]">
           <h3 className="text-lg font-semibold text-foreground">💳 {tr("pay_mobile")}</h3>
           <p className="mt-1 text-xs text-muted-foreground mb-4">
@@ -394,18 +461,47 @@ function PaymentPanel({ ticketId }: { ticketId: string }) {
           </p>
           <div className="flex gap-2">
             <span className="grid place-items-center rounded-md border border-input bg-secondary px-3 text-sm font-medium">+250</span>
-            <Input required inputMode="numeric" maxLength={9} placeholder="78xxxxxxx" value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, ""))} />
+            <Input required inputMode="numeric" maxLength={9} placeholder="78xxxxxxx" value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, ""))} disabled={isPending} />
           </div>
           <div className="mt-3 flex items-start gap-2">
-            <input type="checkbox" id="confirm-pay" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} className="mt-0.5 accent-accent" />
+            <input type="checkbox" id="confirm-pay" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} className="mt-0.5 accent-accent" disabled={isPending} />
             <label htmlFor="confirm-pay" className="text-xs text-muted-foreground cursor-pointer">
               I confirm I want to pay <strong>{total.toLocaleString()} RWF</strong> for my prescription medicines.
             </label>
           </div>
-          <Button type="submit" disabled={!confirmed} className="mt-4 w-full bg-accent text-accent-foreground hover:bg-accent/90 disabled:opacity-50">
-            {tr("pay_btn")} {total.toLocaleString()} RWF
+          <Button type="submit" disabled={!confirmed || isPending} className="mt-4 w-full bg-accent text-accent-foreground hover:bg-accent/90 disabled:opacity-50">
+            {isPending ? tr("payment_pending") : `${tr("pay_btn")} ${total.toLocaleString()} RWF`}
           </Button>
+
+          {ticket.paymentRequest && (
+            <div className="mt-4 rounded-md border border-border bg-secondary p-3 text-sm">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="font-semibold">{tr("payment_request_status")} — {ticket.paymentRequest.status}</div>
+                  <div className="text-xs text-muted-foreground">{ticket.paymentRequest.phone} · {ticket.paymentRequest.amount} RWF</div>
+                  {isPending && <p className="mt-2 text-xs text-muted-foreground">{tr("payment_auto_check")}</p>}
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={checkPayment} size="sm" disabled={verifying || !isPending} variant="outline">{verifying ? tr("checking") : tr("check_payment")}</Button>
+                </div>
+              </div>
+            </div>
+          )}
         </form>
+      )}
+
+      {isPaid && (
+        <div className="rounded-xl border border-green-200 bg-green-50 p-5 text-sm text-green-900">
+          <div className="font-semibold">{tr("payment_confirmed")}</div>
+          <p className="mt-2 text-xs text-green-800">{tr("payment_success_banner")}</p>
+        </div>
+      )}
+
+      {isFailed && (
+        <div className="rounded-xl border border-destructive bg-red-50 p-5 text-sm text-destructive">
+          <div className="font-semibold">{tr("payment_failed")}</div>
+          <p className="mt-2 text-xs text-destructive">{tr("payment_failed_banner")}</p>
+        </div>
       )}
 
       {total === 0 && (
@@ -421,7 +517,7 @@ function PharmacyPanel({ ticket }: { ticket: QueueTicket }) {
   const tr = useT();
   const { user } = useAuth();
   const transferItems = (ticket.prescription ?? []).filter(p => p.transfer);
-  const locationKey = [user?.province, user?.district, user?.sector].filter(Boolean).map(v => v?.toLowerCase());
+  const locationKey = [user?.province, user?.district, user?.sector].filter((v): v is string => !!v).map(v => v.toLowerCase());
   const nearby = NEARBY_PHARMACIES.filter(ph => locationKey.some(key => [ph.province, ph.district, ph.sector].map(v => v.toLowerCase()).includes(key)));
   const shownPharmacies = nearby.length > 0 ? nearby : NEARBY_PHARMACIES;
 
