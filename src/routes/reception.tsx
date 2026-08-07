@@ -7,7 +7,7 @@ import { Header } from "@/components/Header";
 import { RoleGuard } from "@/components/RoleGuard";
 import { Button } from "@/components/ui/button";
 import { useDb } from "@/lib/hooks";
-import { db } from "@/lib/store";
+import { db, validateVitals } from "@/lib/store";
 import { useT } from "@/lib/i18n";
 
 export const Route = createFileRoute("/reception")({
@@ -39,7 +39,19 @@ function Page() {
   const vitalsFor = (ticketId: string) => {
     const t = db.all().queue.find((x: any) => x.id === ticketId);
     if (!t) return "-";
-    return `W: ${t.vitals.weight}kg, T: ${t.vitals.temperature}°C, BP: ${t.vitals.bloodPressure}`;
+    const w = t.vitals?.weight ?? "—";
+    const temp = t.vitals?.temperature ?? "—";
+    const bp = t.vitals?.bloodPressure ?? "—";
+    return `W: ${w}kg, T: ${temp}°C, BP: ${bp}`;
+  };
+
+  const passToDoctor = (ticketId: string) => {
+    const t = db.all().queue.find((x: any) => x.id === ticketId);
+    if (!t) return;
+    const err = validateVitals(t.vitals);
+    if (err) return toast.error(tr(err));
+    db.markReceptionPassed(t.id);
+    toast.success(tr("reception_passed"));
   };
 
   const exportReport = () => {
@@ -53,9 +65,9 @@ function Page() {
       startY: 32,
       head: [["Token", "Patient", "Phone", "Department", "Room", "Weight", "Temperature", "BP", "Insurance", "Location", "Status", "Created At"]],
       body: (all.queue || []).map((t: any) => {
-        const user = all.users.find((u: any) => u.id === t.patientId) || {};
-        const phone = user.phone || "";
-        const location = user.province ? `${user.province} | ${user.district} | ${user.sector} | ${user.village}` : "";
+        const user = all.users.find((u: any) => u.id === t.patientId);
+        const phone = user?.phone || "";
+        const location = user?.province ? `${user.province} | ${user.district} | ${user.sector} | ${user.village}` : "";
         return [
           t.token,
           t.patientName,
@@ -65,7 +77,7 @@ function Page() {
           t.vitals?.weight || "",
           t.vitals?.temperature || "",
           t.vitals?.bloodPressure || "",
-          user.insurance || "",
+          user?.insurance || "",
           location,
           t.status,
           new Date(t.createdAt).toISOString(),
@@ -131,7 +143,7 @@ function Page() {
                   <td className="p-3 text-right space-x-2">
                     <Button size="sm" variant="outline" onClick={() => setModal({ patientId: t.patientId, ticketId: t.id })}>{tr("edit_info")}</Button>
                     <Button size="sm" variant="outline" onClick={() => setEmergency({ ticketId: t.id, description: "" })}>{tr("triage")}</Button>
-                    <Button size="sm" variant="outline" onClick={() => { db.markReceptionPassed(t.id); toast.success(tr("reception_passed")); }} disabled={t.readyForDoctor}>{t.readyForDoctor ? tr("ready_for_doctor") : tr("pass_to_doctor")}</Button>
+                    <Button size="sm" variant="outline" onClick={() => passToDoctor(t.id)} disabled={t.readyForDoctor}>{t.readyForDoctor ? tr("ready_for_doctor") : tr("pass_to_doctor")}</Button>
                     <Button size="sm" variant="outline" onClick={() => { db.removeTicket(t.id); toast.success(tr("token_removed")); }}>{tr("remove")}</Button>
                   </td>
                 </tr>
@@ -162,19 +174,8 @@ function EditModal({ patientId, ticketId, onClose }: { patientId: string; ticket
   const [bloodPressure, setBloodPressure] = useState(ticket?.vitals.bloodPressure || "");
 
   const save = () => {
-    const weightNum = parseFloat(weight);
-    const tempNum = parseFloat(temperature);
-    const bpMatch = bloodPressure.trim().match(/^(\d{2,3})\/(\d{2,3})$/);
-
-    if (!weight) return toast.error(tr("weight_required"));
-    if (Number.isNaN(weightNum) || weightNum < 20 || weightNum > 200) return toast.error(tr("weight_invalid"));
-    if (!temperature) return toast.error(tr("temperature_required"));
-    if (Number.isNaN(tempNum) || tempNum < 34 || tempNum > 42) return toast.error(tr("temperature_invalid"));
-    if (!bloodPressure) return toast.error(tr("bp_required"));
-    if (!bpMatch) return toast.error(tr("bp_invalid_format"));
-    const systolic = Number(bpMatch[1]);
-    const diastolic = Number(bpMatch[2]);
-    if (systolic < 80 || systolic > 180 || diastolic < 40 || diastolic > 120) return toast.error(tr("bp_invalid_value"));
+    const err = validateVitals({ weight, temperature, bloodPressure });
+    if (err) return toast.error(tr(err));
     db.updatePatientLocation(patientId, { province, district, sector, village });
     if (insurance) { const u = db.all().users.find((x: any) => x.id === patientId); if (u) u.insurance = insurance; }
     if (ticket) {

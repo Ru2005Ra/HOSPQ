@@ -42,6 +42,49 @@ export interface Vitals {
   notes?: string;
 }
 
+/**
+ * Validate reception vitals. Returns an i18n translation key describing the
+ * first validation error, or `null` when all vitals are valid.
+ *
+ * Rules:
+ *  - weight       required, numeric, 20–200 kg
+ *  - temperature  required, numeric, 34–42 °C
+ *  - bloodPressure required, systolic/diastolic format (e.g. 120/80),
+ *                  systolic 80–180, diastolic 40–120
+ */
+export type VitalsErrorKey =
+  | "weight_required"
+  | "weight_invalid"
+  | "temperature_required"
+  | "temperature_invalid"
+  | "bp_required"
+  | "bp_invalid_format"
+  | "bp_invalid_value";
+
+export function validateVitals(v: Partial<Vitals> | undefined | null): VitalsErrorKey | null {
+  if (!v) return "weight_required";
+  const weight = v.weight?.trim() ?? "";
+  const temperature = v.temperature?.trim() ?? "";
+  const bloodPressure = v.bloodPressure?.trim() ?? "";
+
+  if (!weight) return "weight_required";
+  const weightNum = Number(weight);
+  if (Number.isNaN(weightNum) || weightNum < 20 || weightNum > 200) return "weight_invalid";
+
+  if (!temperature) return "temperature_required";
+  const tempNum = Number(temperature);
+  if (Number.isNaN(tempNum) || tempNum < 34 || tempNum > 42) return "temperature_invalid";
+
+  if (!bloodPressure) return "bp_required";
+  const bpMatch = bloodPressure.match(/^(\d{2,3})\/(\d{2,3})$/);
+  if (!bpMatch) return "bp_invalid_format";
+  const systolic = Number(bpMatch[1]);
+  const diastolic = Number(bpMatch[2]);
+  if (systolic < 80 || systolic > 180 || diastolic < 40 || diastolic > 120) return "bp_invalid_value";
+
+  return null;
+}
+
 export interface LabTestCatalogItem {
   id: string;
   name: string;
