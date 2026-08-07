@@ -203,11 +203,11 @@ export const db = {
   reset: () => { localStorage.removeItem(KEY); read(); },
 
   
-  registerPatient(data: { firstName: string; lastName: string; phone: string; password: string; sex: "male" | "female"; province?: string; district?: string; sector?: string; village?: string }): User {
+  registerPatient(data: { firstName: string; lastName: string; username: string; phone: string; password: string; sex: "male" | "female"; province?: string; district?: string; sector?: string; village?: string }): User {
 
     const d = read();
-    if (d.users.find(u => u.role === "patient" && u.phone === data.phone)) {
-      throw new Error("A patient with this phone already exists. Please login.");
+    if (d.users.find(u => u.role === "patient" && (u.phone === data.phone || u.username === data.username))) {
+      throw new Error("A patient with this phone or username already exists. Please login.");
     }
     const user: User = { id: uid(), role: "patient", ...data };
     d.users.push(user);
@@ -215,50 +215,40 @@ export const db = {
     write(d);
     return user;
   },
-  resetPatientPassword(firstName: string, lastName: string, phone: string, newPassword: string): void {
+  resetPassword(username: string, firstName: string, lastName: string, newPassword: string): void {
     const d = read();
-    const u = d.users.find(x => x.role === "patient" && x.firstName.toLowerCase() === firstName.toLowerCase() && x.lastName.toLowerCase() === lastName.toLowerCase() && x.phone === `+250${phone}`);
-    if (!u) throw new Error("No patient found with those details");
+    const u = d.users.find(x =>
+      (x.username ?? "").toLowerCase() === username.toLowerCase() &&
+      x.firstName.toLowerCase() === firstName.toLowerCase() &&
+      x.lastName.toLowerCase() === lastName.toLowerCase()
+    );
+    if (!u) throw new Error("No account found with those details");
     if (newPassword.length < 6) throw new Error("Password must be at least 6 characters");
     u.password = newPassword;
     write(d);
   },
-  resetStaffPassword(username: string, firstName: string, lastName: string, newPassword: string): void {
+  login(username: string, password: string): User {
     const d = read();
-    const u = d.users.find(x => x.username === username && x.firstName.toLowerCase() === firstName.toLowerCase() && x.lastName.toLowerCase() === lastName.toLowerCase() && x.role !== "patient");
-    if (!u) throw new Error("No staff account found with those details");
-    if (newPassword.length < 6) throw new Error("Password must be at least 6 characters");
-    u.password = newPassword;
-    write(d);
-  },
-  loginPatient(firstName: string, lastName: string, password: string): User {
-    const d = read();
-    const u = d.users.find(x => x.role === "patient" && x.firstName.toLowerCase() === firstName.toLowerCase() && x.lastName.toLowerCase() === lastName.toLowerCase() && x.password === password);
-    if (!u) throw new Error("Invalid credentials");
+    const u = d.users.find(x => (x.username ?? "").toLowerCase() === username.toLowerCase() && x.password === password);
+    if (!u) throw new Error("Invalid username or password");
     d.session = { userId: u.id, justRegistered: false };
-    write(d);
-    return u;
-  },
-  loginStaff(username: string, password: string): User {
-    const d = read();
-    const u = d.users.find(x => x.username === username && x.password === password && x.role !== "patient");
-    if (!u) throw new Error("Invalid credentials");
-    d.session = { userId: u.id };
-    const deptMap: Partial<Record<Role, string>> = {
-      doctor: "Doctor Consultation",
-      reception: "Reception Desk",
-      storekeeper: "Pharmacy",
-      laboratory: "Laboratory",
-      manager: "Management",
-    };
-    d.attendance.push({
-      id: uid(),
-      doctorId: u.id,
-      doctorName: `${u.firstName} ${u.lastName}`,
-      role: u.role,
-      department: deptMap[u.role] ?? u.role,
-      loginAt: Date.now(),
-    });
+    if (u.role !== "patient") {
+      const deptMap: Partial<Record<Role, string>> = {
+        doctor: "Doctor Consultation",
+        reception: "Reception Desk",
+        storekeeper: "Pharmacy",
+        laboratory: "Laboratory",
+        manager: "Management",
+      };
+      d.attendance.push({
+        id: uid(),
+        doctorId: u.id,
+        doctorName: `${u.firstName} ${u.lastName}`,
+        role: u.role,
+        department: deptMap[u.role] ?? u.role,
+        loginAt: Date.now(),
+      });
+    }
     write(d);
     return u;
   },
