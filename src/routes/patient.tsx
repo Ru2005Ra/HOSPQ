@@ -349,61 +349,111 @@ function PaymentPanel({ ticketId }: { ticketId: string }) {
   };
 
   return (
-    <div className="grid gap-4">
-      <div className="rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-        <div className="flex items-center gap-2 mb-4">
-          <Receipt className="h-5 w-5 text-accent" />
-          <h2 className="text-lg font-semibold text-foreground">{tr("prescription_summary")}</h2>
+    <div className="grid gap-6">
+      {/* Prescription Summary Card */}
+      <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)] overflow-hidden">
+        <div className="px-6 py-4 border-b border-border bg-secondary">
+          <div className="flex items-center gap-2">
+            <Receipt className="h-5 w-5 text-accent" />
+            <h2 className="font-semibold text-foreground">{tr("prescription_summary")}</h2>
+          </div>
         </div>
-        {(ticket.prescription ?? []).length === 0 ? (
-          <p className="text-sm text-muted-foreground">No medicines prescribed.</p>
-        ) : (
-          <ul className="divide-y divide-border text-sm">
-            {(ticket.prescription ?? []).map((p: any, i: number) => (
-              <li key={i} className="flex justify-between py-2">
-                <span className="flex-1">
-                  {p.name} × {p.qty}
-                  {p.transfer && <span className="ml-2 rounded-full bg-orange-100 px-2 py-0.5 text-xs text-orange-700">Buy outside</span>}
-                </span>
-                <span className="font-medium">{p.transfer ? "—" : `${(p.price * p.qty).toLocaleString()} RWF`}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="mt-4 flex justify-between border-t border-border pt-3 text-base font-bold">
-          <span>{tr("total")}</span>
-          <span className="text-accent">{total.toLocaleString()} RWF</span>
+        <div className="p-6">
+          {(ticket.prescription ?? []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">No medicines prescribed.</p>
+          ) : (
+            <>
+              <div className="space-y-3">
+                {(ticket.prescription ?? []).map((p: any, i: number) => (
+                  <div key={i} className="flex justify-between items-center pb-3" style={{ borderBottom: i < (ticket.prescription ?? []).length - 1 ? "1px solid var(--border)" : "none" }}>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">
+                        {p.name} {p.qty > 1 ? `× ${p.qty}` : ""}
+                      </p>
+                      {p.transfer && (
+                        <span className="inline-block mt-1 rounded-full bg-orange-100 px-2 py-0.5 text-xs text-orange-700">
+                          Buy outside
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-sm font-semibold text-foreground ml-4">
+                      {p.transfer ? "—" : `${(p.price * p.qty).toLocaleString()} RWF`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Total Section */}
+              <div className="mt-4 pt-4 border-t border-border">
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-foreground">Total</span>
+                  <span className="text-lg font-bold text-accent">{total.toLocaleString()} RWF</span>
+                </div>
+              </div>
+
+              {hasTransfer && (
+                <p className="mt-4 rounded-md bg-orange-50 border border-orange-200 p-3 text-xs text-orange-700">
+                  ⚠️ Some medicines are out of stock and must be purchased at an outside pharmacy.
+                </p>
+              )}
+              {total === 0 && (
+                <p className="mt-4 rounded-md bg-green-50 border border-green-200 p-3 text-xs text-green-700">
+                  ✅ No payment required — all medicines are transfer items.
+                </p>
+              )}
+            </>
+          )}
         </div>
-        {hasTransfer && (
-          <p className="mt-3 rounded-md bg-orange-50 border border-orange-200 p-2 text-xs text-orange-700">
-            ⚠️ Some medicines are out of stock and must be purchased at an outside pharmacy.
-          </p>
-        )}
-        {total === 0 && (
-          <p className="mt-3 rounded-md bg-green-50 border border-green-200 p-2 text-xs text-green-700">
-            ✅ No payment required — all medicines are transfer items.
-          </p>
-        )}
       </div>
 
+      {/* Pay by Mobile Money Card */}
       {total > 0 && (
         <form onSubmit={pay} className="rounded-xl border-2 border-accent bg-card p-6 shadow-[var(--shadow-card)]">
-          <h3 className="text-lg font-semibold text-foreground">💳 {tr("pay_mobile")}</h3>
-          <p className="mt-1 text-xs text-muted-foreground mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-lg">💳</span>
+            <h3 className="text-lg font-semibold text-foreground">{tr("pay_mobile")}</h3>
+          </div>
+          <p className="text-sm text-muted-foreground mb-5">
             Enter your registered phone number to confirm payment of <strong>{total.toLocaleString()} RWF</strong>.
           </p>
-          <div className="flex gap-2">
-            <span className="grid place-items-center rounded-md border border-input bg-secondary px-3 text-sm font-medium">+250</span>
-            <Input required inputMode="numeric" maxLength={9} placeholder="78xxxxxxx" value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, ""))} />
+
+          {/* Phone Input */}
+          <div className="flex gap-2 mb-4">
+            <div className="flex items-center rounded-md border border-input bg-secondary px-3 text-sm font-medium text-foreground whitespace-nowrap">
+              +250
+            </div>
+            <Input
+              required
+              inputMode="numeric"
+              maxLength={9}
+              placeholder="78xxxxxxx"
+              value={phone}
+              onChange={e => setPhone(e.target.value.replace(/\D/g, ""))}
+              className="flex-1"
+            />
           </div>
-          <div className="mt-3 flex items-start gap-2">
-            <input type="checkbox" id="confirm-pay" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} className="mt-0.5 accent-accent" />
-            <label htmlFor="confirm-pay" className="text-xs text-muted-foreground cursor-pointer">
+
+          {/* Confirmation Checkbox */}
+          <div className="flex items-start gap-3 mb-5">
+            <input
+              type="checkbox"
+              id="confirm-pay"
+              checked={confirmed}
+              onChange={e => setConfirmed(e.target.checked)}
+              className="mt-1 accent-accent cursor-pointer"
+            />
+            <label htmlFor="confirm-pay" className="text-sm text-foreground cursor-pointer">
               I confirm I want to pay <strong>{total.toLocaleString()} RWF</strong> for my prescription medicines.
             </label>
           </div>
-          <Button type="submit" disabled={!confirmed} className="mt-4 w-full bg-accent text-accent-foreground hover:bg-accent/90 disabled:opacity-50">
-            {tr("pay_btn")} {total.toLocaleString()} RWF
+
+          {/* Pay Button */}
+          <Button
+            type="submit"
+            disabled={!confirmed || phone.length !== 9}
+            className="w-full bg-accent text-accent-foreground hover:bg-accent/90 disabled:opacity-50 font-semibold py-2"
+          >
+            Pay {total.toLocaleString()} RWF
           </Button>
         </form>
       )}
