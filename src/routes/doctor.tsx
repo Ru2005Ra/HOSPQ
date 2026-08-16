@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { Header } from "@/components/Header";
 import { RoleGuard } from "@/components/RoleGuard";
 import { Button } from "@/components/ui/button";
@@ -9,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useDb } from "@/lib/hooks";
 import { db } from "@/lib/store";
-import { Trash2 } from "lucide-react";
+import { Trash2, Download } from "lucide-react";
 import { useT } from "@/lib/i18n";
 
 export const Route = createFileRoute("/doctor")({
@@ -24,11 +26,32 @@ function Page() {
   const current = useDb((d) => d.queue?.find((t: any) => t.status === "with-doctor") ?? null);
   const meds = useDb((d) => d.medicines ?? []);
   const waiting = useDb((d) => d.queue?.filter((t: any) => t.status === "waiting").length ?? 0);
+  const completed = useDb((d) => d.queue?.filter((t: any) => t.status === "done") ?? []);
   const [diagnosis, setDiagnosis] = useState("");
   const [note, setNote] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
   const [selectedTests, setSelectedTests] = useState<string[]>([]);
   const labCatalog = useDb((d) => d.labTests ?? []);
+
+  const exportPdf = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(16); doc.text("HospiQ — Doctor's Consultation Report", 14, 18);
+    doc.setFontSize(10); doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 25);
+    autoTable(doc, {
+      startY: 32,
+      head: [[tr("date_col"), tr("patient_col"), tr("diagnosis"), `${tr("medicines")} (RWF)`]],
+      body: completed.map(t => [
+        new Date(t.updatedAt ?? t.createdAt).toLocaleString(),
+        t.patientName,
+        t.diagnosis?.substring(0, 30) + (t.diagnosis?.length > 30 ? "..." : "") || "—",
+        (t.prescription ?? []).map(p => `${p.name} x${p.qty}`).join(", ") || "—",
+      ]),
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [15, 27, 61] },
+    });
+    doc.save(`hospiq-doctor-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+    toast.success("Report exported successfully");
+  };
 
 
   const reset = () => { setDiagnosis(""); setNote(""); setLines([]); };
@@ -70,7 +93,10 @@ function Page() {
             <h1 className="text-3xl font-bold tracking-tight text-foreground">{tr("doctor_title")}</h1>
             <p className="mt-2 text-muted-foreground">{waiting} {waiting === 1 ? tr("patient_waiting") : tr("patients_waiting")}</p>
           </div>
-          <Button onClick={callNext} className="bg-accent text-accent-foreground hover:bg-accent/90" disabled={!!current}>{tr("call_next")}</Button>
+          <div className="flex gap-2">
+            <Button onClick={exportPdf} variant="outline" className="border-accent text-accent hover:bg-accent/10"><Download className="mr-2 h-4 w-4" /> {tr("export_pdf")}</Button>
+            <Button onClick={callNext} className="bg-accent text-accent-foreground hover:bg-accent/90" disabled={!!current}>{tr("call_next")}</Button>
+          </div>
         </div>
 
         {!current && (

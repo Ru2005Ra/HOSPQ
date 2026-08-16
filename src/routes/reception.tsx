@@ -1,11 +1,14 @@
 import React, { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { Header } from "@/components/Header";
 import { RoleGuard } from "@/components/RoleGuard";
 import { Button } from "@/components/ui/button";
 import { useDb } from "@/lib/hooks";
 import { db } from "@/lib/store";
+import { Download } from "lucide-react";
 import { useT } from "@/lib/i18n";
 
 export const Route = createFileRoute("/reception")({
@@ -20,6 +23,28 @@ function Page() {
   const today = queue.filter((t: any) => t.createdAt > Date.now() - 24 * 3600 * 1000);
   const [modal, setModal] = useState<{ patientId: string; ticketId: string } | null>(null);
   const [emergency, setEmergency] = useState<{ ticketId: string; description: string } | null>(null);
+
+  const exportPdf = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(16); doc.text("HospiQ — Reception Queue Report", 14, 18);
+    doc.setFontSize(10); doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 25);
+    autoTable(doc, {
+      startY: 32,
+      head: [[tr("token_col"), tr("patient_col"), tr("department"), "Location", tr("insurance_col"), "Vitals"]],
+      body: waiting.map(t => [
+        `#${t.token}`,
+        t.patientName,
+        t.department || "—",
+        locationFor(t.patientId),
+        insuranceFor(t.patientId),
+        vitalsFor(t.id),
+      ]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [15, 27, 61] },
+    });
+    doc.save(`hospiq-reception-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+    toast.success("Report exported successfully");
+  };
 
   const locationFor = (patientId: string) => {
     const patient = db.all().users.find((u: any) => u.id === patientId);
@@ -42,8 +67,13 @@ function Page() {
     <div className="min-h-screen bg-background">
       <Header />
       <main className="mx-auto max-w-5xl px-4 py-10">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">{tr("reception_title")}</h1>
-        <p className="mt-2 text-muted-foreground">{tr("reception_desc")}</p>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">{tr("reception_title")}</h1>
+            <p className="mt-2 text-muted-foreground">{tr("reception_desc")}</p>
+          </div>
+          <Button onClick={exportPdf} variant="outline" className="border-accent text-accent hover:bg-accent/10"><Download className="mr-2 h-4 w-4" /> {tr("export_pdf")}</Button>
+        </div>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-3">
           <Stat label={tr("in_queue")} value={waiting.length} />

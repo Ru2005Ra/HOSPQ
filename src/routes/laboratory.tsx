@@ -1,9 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { Header } from "@/components/Header";
 import { RoleGuard } from "@/components/RoleGuard";
 import { Button } from "@/components/ui/button";
 import { useDb } from "@/lib/hooks";
 import { db } from "@/lib/store";
+import { Download } from "lucide-react";
+import { toast } from "sonner";
 import { useT } from "@/lib/i18n";
 
 export const Route = createFileRoute("/laboratory")({
@@ -14,6 +18,28 @@ export const Route = createFileRoute("/laboratory")({
 function LabPage() {
   const tr = useT();
   const queue = useDb((d) => d.queue?.filter((t: any) => t.departmentCode === "LB" && t.status !== "done" && t.status !== "removed") ?? []);
+  const completed = useDb((d) => d.queue?.filter((t: any) => t.departmentCode === "LB" && t.status === "done") ?? []);
+
+  const exportPdf = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(16); doc.text("HospiQ — Laboratory Test Report", 14, 18);
+    doc.setFontSize(10); doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 25);
+    autoTable(doc, {
+      startY: 32,
+      head: [[tr("token_col"), tr("patient_col"), "Test Ordered", "Status", "Completed Date"]],
+      body: completed.map(t => [
+        `#${t.token}`,
+        t.patientName,
+        (t.labTests ?? []).join(", ") || "—",
+        "Completed",
+        t.status === "done" ? new Date(t.updatedAt ?? t.createdAt).toLocaleString() : "—",
+      ]),
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [15, 27, 61] },
+    });
+    doc.save(`hospiq-lab-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+    toast.success("Report exported successfully");
+  };
 
   return (
     <div className="min-h-screen bg-background">
