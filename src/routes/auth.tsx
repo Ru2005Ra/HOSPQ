@@ -151,25 +151,79 @@ function Login({ onSuccess }: { onSuccess: () => void }) {
   };
   if (forgot) return <ForgotPasswordPatient onBack={() => setForgot(false)} />;
   return (
-    <form onSubmit={submit} className="grid gap-4">
-      <div className="grid grid-cols-2 gap-3">
-        <div><Label>{tr("first_name")}</Label><Input required value={f.firstName} onChange={e => setF({ ...f, firstName: e.target.value })} /></div>
-        <div><Label>{tr("last_name")}</Label><Input required value={f.lastName} onChange={e => setF({ ...f, lastName: e.target.value })} /></div>
+    <div className="rounded-xl border border-border bg-card p-8 shadow-[var(--shadow-card)]">
+      {/* Header */}
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-bold text-foreground">Login to your account</h2>
+        <p className="mt-2 text-sm text-muted-foreground">Use your name and password. You will be taken to your patient dashboard automatically.</p>
       </div>
-      <div>
-        <Label>{tr("password")}</Label>
-        <div className="relative mt-1">
-          <Input required type={showPass ? "text" : "password"} value={f.password} onChange={e => setF({ ...f, password: e.target.value })} />
-          <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" onClick={() => setShowPass(p => !p)}>
-            {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+
+      <form onSubmit={submit} className="space-y-5">
+        {/* Name Fields */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label className="text-sm font-semibold text-foreground">{tr("first_name")}</Label>
+            <Input
+              required
+              value={f.firstName}
+              onChange={e => setF({ ...f, firstName: e.target.value })}
+              className="mt-2"
+              placeholder="First name"
+            />
+          </div>
+          <div>
+            <Label className="text-sm font-semibold text-foreground">{tr("last_name")}</Label>
+            <Input
+              required
+              value={f.lastName}
+              onChange={e => setF({ ...f, lastName: e.target.value })}
+              className="mt-2"
+              placeholder="Last name"
+            />
+          </div>
+        </div>
+
+        {/* Password Field */}
+        <div>
+          <Label className="text-sm font-semibold text-foreground">{tr("password")}</Label>
+          <div className="relative mt-2">
+            <Input
+              required
+              type={showPass ? "text" : "password"}
+              value={f.password}
+              onChange={e => setF({ ...f, password: e.target.value })}
+              placeholder="Enter your password"
+            />
+            <button
+              type="button"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              onClick={() => setShowPass(p => !p)}
+            >
+              {showPass ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Forgot Password Link */}
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => setForgot(true)}
+            className="text-sm text-accent hover:underline font-medium"
+          >
+            Forgot password?
           </button>
         </div>
-      </div>
-      <div className="flex justify-end">
-        <button type="button" onClick={() => setForgot(true)} className="text-xs text-accent hover:underline">Forgot password?</button>
-      </div>
-      <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90">{tr("login")}</Button>
-    </form>
+
+        {/* Login Button */}
+        <Button
+          type="submit"
+          className="w-full bg-accent text-accent-foreground hover:bg-accent/90 py-2.5 font-semibold text-base"
+        >
+          {tr("login")}
+        </Button>
+      </form>
+    </div>
   );
 }
 
@@ -226,24 +280,84 @@ function StaffLogin({ onSuccess }: { onSuccess: (r: Role) => void }) {
   };
   if (forgot) return <ForgotPasswordStaff onBack={() => setForgot(false)} />;
   return (
-    <form onSubmit={submit} className="grid gap-4 rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-      <p className="text-xs text-muted-foreground">{tr("staff_note")}</p>
-      <div><Label>{tr("username")}</Label><Input required value={f.username} onChange={e => setF({ ...f, username: e.target.value })} /></div>
-      <div>
-        <Label>{tr("password")}</Label>
-        <div className="relative mt-1">
-          <Input required type={showPass ? "text" : "password"} value={f.password} onChange={e => setF({ ...f, password: e.target.value })} />
-          <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" onClick={() => setShowPass(p => !p)}>
-            {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+    <form onSubmit={submit} className="rounded-xl border border-border bg-card p-8 shadow-[var(--shadow-card)]">
+      {/* Header */}
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-bold text-foreground">Login to your account</h2>
+        <p className="mt-2 text-sm text-muted-foreground">Use your username and password. You will be taken to the right dashboard automatically.</p>
+      </div>
+
+      <div className="space-y-5">
+        {/* Username Field */}
+        <div>
+          <Label className="text-sm font-semibold text-foreground">{tr("username")}</Label>
+          <Input
+            required
+            value={f.username}
+            onChange={e => setF({ ...f, username: e.target.value })}
+            className="mt-2"
+            placeholder="Enter your username"
+          />
+        </div>
+
+        {/* Password Field */}
+        <div>
+          <Label className="text-sm font-semibold text-foreground">{tr("password")}</Label>
+          <div className="relative mt-2">
+            <Input
+              required
+              type={showPass ? "text" : "password"}
+              value={f.password}
+              onChange={e => setF({ ...f, password: e.target.value })}
+              placeholder="Enter your password"
+            />
+            <button
+              type="button"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              onClick={() => setShowPass(p => !p)}
+            >
+              {showPass ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Forgot Password Link */}
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => setForgot(true)}
+            className="text-sm text-accent hover:underline font-medium"
+          >
+            Forgot password?
           </button>
         </div>
+
+        {/* Login Button */}
+        <Button
+          type="submit"
+          className="w-full bg-accent text-accent-foreground hover:bg-accent/90 py-2.5 font-semibold text-base"
+        >
+          {tr("login")}
+        </Button>
+
+        {/* New Account Section */}
+        <div className="text-center pt-2">
+          <p className="text-sm text-muted-foreground">
+            New to HospiQ?{" "}
+            <button type="button" className="text-accent hover:underline font-semibold">
+              Create a new account
+            </button>
+          </p>
+        </div>
       </div>
-      <div className="flex justify-end">
-        <button type="button" onClick={() => setForgot(true)} className="text-xs text-accent hover:underline">Forgot password?</button>
+
+      {/* Demo Credentials */}
+      <div className="mt-8 pt-6 border-t border-border text-center">
+        <p className="text-xs text-blue-600 font-medium">
+          Demo: <span className="font-mono">reception/reception123</span>, <span className="font-mono">doctor/doctor123</span>,{" "}
+          <span className="font-mono">pharmacy/pharmacy123</span>, <span className="font-mono">manager/manager123</span>, <span className="font-mono">lab/lab123</span>
+        </p>
       </div>
-      <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90">{tr("login")}</Button>
-      <p className="text-xs text-muted-foreground">{tr("demo_label")} <code>reception</code>/<code>reception123</code>, <code>doctor</code>/<code>doctor123</code>, <code>pharmacy</code>/<code>pharmacy123</code>, <code>manager</code>/<code>manager123</code></p>
-      <p className="text-xs text-muted-foreground">Lab: <code>lab</code>/<code>lab123</code></p>
     </form>
   );
 }

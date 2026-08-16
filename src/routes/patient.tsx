@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth, useDb, fmtDuration } from "@/lib/hooks";
 import { db, DEPARTMENTS, type QueueTicket } from "@/lib/store";
+import { getProvinces, getDistricts, getSectors, getVillages } from "@/lib/locations";
 import { Clock3, Pill, Receipt, ShieldPlus, MapPin, CheckCheck, X, Loader2 } from "lucide-react";
 import { useT } from "@/lib/i18n";
 
@@ -88,8 +89,8 @@ function StartVisit() {
 
   const submitLocation = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!location.province || !location.district || !location.sector || !location.cell)
-      return toast.error("Please fill in all location fields");
+    if (!location.province || !location.district || !location.sector)
+      return toast.error("Please fill in province, district, and village fields");
     setStep("dept");
   };
 
@@ -117,21 +118,97 @@ function StartVisit() {
   );
 
   if (step === "location") return (
-    <form onSubmit={submitLocation} className="mt-8 grid gap-5 rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-      <div className="flex items-center gap-2">
-        <MapPin className="h-5 w-5 text-accent" />
-        <h2 className="text-xl font-semibold text-foreground">Your Location</h2>
+    <form onSubmit={submitLocation} className="mt-8 rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
+      {/* Header */}
+      <div className="px-6 py-5 border-b border-border bg-secondary">
+        <div className="flex items-center gap-2">
+          <MapPin className="h-5 w-5 text-accent" />
+          <h2 className="text-xl font-semibold text-foreground">Your Location</h2>
+        </div>
+        <p className="text-sm text-muted-foreground mt-1">This helps us identify you correctly. Please select your province, district, sector and cell.</p>
       </div>
-      <p className="text-sm text-muted-foreground -mt-2">This helps us identify you correctly. Please fill in all fields.</p>
-      <div className="grid grid-cols-2 gap-3">
-        <div><Label>{tr("province")}</Label><Input required placeholder="e.g. Kigali" value={location.province} onChange={e => setLocation({ ...location, province: e.target.value })} /></div>
-        <div><Label>{tr("district")}</Label><Input required placeholder="e.g. Gasabo" value={location.district} onChange={e => setLocation({ ...location, district: e.target.value })} /></div>
-        <div><Label>{tr("sector")}</Label><Input required placeholder="e.g. Kimironko" value={location.sector} onChange={e => setLocation({ ...location, sector: e.target.value })} /></div>
-        <div><Label>Cell</Label><Input required placeholder="e.g. Bibare" value={location.cell} onChange={e => setLocation({ ...location, cell: e.target.value })} /></div>
+
+      {/* Content */}
+      <div className="p-6 grid gap-5">
+        <div className="grid grid-cols-3 gap-4">
+          {/* Province */}
+          <div>
+            <Label className="text-sm font-semibold text-foreground">Province <span className="text-accent">*</span></Label>
+            <select
+              required
+              value={location.province}
+              onChange={e => {
+                const prov = e.target.value;
+                setLocation({ province: prov, district: "", sector: "", cell: "" });
+              }}
+              className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent/50"
+            >
+              <option value="">Select province</option>
+              {getProvinces().map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+
+          {/* District */}
+          <div>
+            <Label className="text-sm font-semibold text-foreground">District <span className="text-accent">*</span></Label>
+            <select
+              required
+              disabled={!location.province}
+              value={location.district}
+              onChange={e => {
+                const dist = e.target.value;
+                setLocation({ ...location, district: dist, sector: "", cell: "" });
+              }}
+              className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent/50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <option value="">Select district</option>
+              {location.province && getDistricts(location.province).map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+
+          {/* Sector/Village */}
+          <div>
+            <Label className="text-sm font-semibold text-foreground">Village <span className="text-accent">*</span></Label>
+            <select
+              required
+              disabled={!location.district}
+              value={location.sector}
+              onChange={e => {
+                const sect = e.target.value;
+                setLocation({ ...location, sector: sect, cell: "" });
+              }}
+              className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent/50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <option value="">Select village</option>
+              {location.province && location.district && getSectors(location.province, location.district).map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Cell/Sector (if needed) */}
+        <div>
+          <Label className="text-sm font-semibold text-foreground">Cell / Sector Detail</Label>
+          <select
+            value={location.cell}
+            onChange={e => setLocation({ ...location, cell: e.target.value })}
+            className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent/50"
+          >
+            <option value="">Select cell or leave blank</option>
+            {location.province && location.district && location.sector && getVillages(location.province, location.district, location.sector).map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </div>
       </div>
-      <div className="flex gap-3">
+
+      {/* Footer */}
+      <div className="px-6 py-4 border-t border-border bg-secondary flex gap-3">
         <Button type="button" variant="outline" onClick={() => setStep("choice")}>{tr("cancel")}</Button>
-        <Button type="submit" className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90">Next →</Button>
+        <Button 
+          type="submit" 
+          disabled={!location.province || !location.district || !location.sector}
+          className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 disabled:opacity-50"
+        >
+          Next →
+        </Button>
       </div>
     </form>
   );
