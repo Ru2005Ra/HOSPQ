@@ -47,7 +47,7 @@ function Page() {
 
         <div className="mt-8 grid gap-4 sm:grid-cols-3">
           <Stat label={tr("in_queue")} value={waiting.length} />
-          <Stat label={tr("avg_wait")} value={`${waiting.length * 3} min`} />
+          <Stat label={tr("avg_wait")} value={`${waiting.length * 5} min`} />
           <Stat label={tr("today_total")} value={today.length} />
         </div>
 

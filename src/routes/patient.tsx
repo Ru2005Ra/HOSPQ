@@ -5,7 +5,7 @@ import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAuth, useDb, fmtDuration } from "@/lib/hooks";
+import { useAuth, useDb, fmtDuration, fmtDurationWithSeconds } from "@/lib/hooks";
 import { db, DEPARTMENTS, type QueueTicket } from "@/lib/store";
 import { getProvinces, getDistricts, getSectors, getVillages } from "@/lib/locations";
 import { Clock3, Pill, Receipt, ShieldPlus, MapPin, CheckCheck, X, Loader2 } from "lucide-react";
@@ -100,7 +100,7 @@ function StartVisit() {
     db.updatePatientLocation(user.id, { province: location.province, district: location.district, sector: location.sector, village: location.cell });
     const t = db.enqueue(user, departmentCode, insurance, {});
     const pos = db.all().queue.filter((x: any) => x.departmentCode === departmentCode && x.status === "waiting").length;
-    const waitMin = pos * 3;
+    const waitMin = pos * 5;
     toast.success(`Token #${t.token} — estimated wait: ${waitMin} min`);
   };
 
@@ -259,13 +259,13 @@ function TokenCard({ ticket }: { ticket: QueueTicket }) {
     if (!t) return 0;
     return d.queue?.filter((x: any) => x.status === "waiting" && x.createdAt < t.createdAt).length ?? 0;
   });
-  const waitMs = ahead * 3 * 60 * 1000;
+  const waitMs = ahead * 5 * 60 * 1000;
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const i = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(i); }, []);
   const deadline = useMemo(() => ticket.createdAt + waitMs, [ticket.createdAt, waitMs]);
   const remaining = Math.max(0, deadline - now);
-  const green = remaining >= 3 * 60 * 1000;
-  const estimatedWaitMin = ahead * 3;
+  const green = remaining >= 5 * 60 * 1000;
+  const estimatedWaitMin = ahead * 5;
 
   return (
     <div className="rounded-2xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">
@@ -284,7 +284,7 @@ function TokenCard({ ticket }: { ticket: QueueTicket }) {
           {ahead > 0 && (
             <div className="mt-3 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold ml-2"
               style={{ background: green ? "color-mix(in oklab, var(--success) 15%, transparent)" : "color-mix(in oklab, var(--destructive) 15%, transparent)", color: green ? "var(--success)" : "var(--destructive)" }}>
-              <Clock3 className="h-4 w-4" /> {fmtDuration(remaining)} {green ? tr("you_have_time") : tr("stay_nearby")}
+              <Clock3 className="h-4 w-4" /> <span className="font-mono font-bold">{fmtDurationWithSeconds(remaining)}</span> {green ? tr("you_have_time") : tr("stay_nearby")}
             </div>
           )}
           {ahead === 0 && <p className="mt-3 text-sm font-semibold text-destructive">{tr("stay_close")}</p>}

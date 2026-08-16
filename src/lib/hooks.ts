@@ -100,3 +100,12 @@ export function fmtDuration(ms: number) {
   const m = totalMin % 60;
   return h > 0 ? `${h}h ${m}m` : `${m} min`;
 }
+
+// ─── fmtDurationWithSeconds ──────────────────────────────────────────────────
+export function fmtDurationWithSeconds(ms: number) {
+  if (ms <= 0) return "0:00";
+  const totalSec = Math.ceil(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
