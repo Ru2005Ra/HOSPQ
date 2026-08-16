@@ -196,9 +196,11 @@ export const db = {
   reset: () => { localStorage.removeItem(KEY); read(); },
 
   
-  registerPatient(data: { firstName: string; lastName: string; phone: string; password: string; sex: "male" | "female"; province?: string; district?: string; sector?: string; village?: string }): User {
-
+  registerPatient(data: { username: string; firstName: string; lastName: string; phone: string; password: string; sex: "male" | "female"; province?: string; district?: string; sector?: string; village?: string }): User {
     const d = read();
+    if (d.users.find(u => u.username === data.username)) {
+      throw new Error("This username is already taken. Please choose another.");
+    }
     if (d.users.find(u => u.role === "patient" && u.phone === data.phone)) {
       throw new Error("A patient with this phone already exists. Please login.");
     }
@@ -229,6 +231,32 @@ export const db = {
     const u = d.users.find(x => x.role === "patient" && x.firstName.toLowerCase() === firstName.toLowerCase() && x.lastName.toLowerCase() === lastName.toLowerCase() && x.password === password);
     if (!u) throw new Error("Invalid credentials");
     d.session = { userId: u.id, justRegistered: false };
+    write(d);
+    return u;
+  },
+  login(username: string, password: string): User {
+    const d = read();
+    const u = d.users.find(x => x.username === username && x.password === password);
+    if (!u) throw new Error("Invalid username or password");
+    d.session = { userId: u.id };
+    // Track attendance for staff only
+    if (u.role !== "patient") {
+      const deptMap: Partial<Record<Role, string>> = {
+        doctor: "Doctor Consultation",
+        reception: "Reception Desk",
+        storekeeper: "Pharmacy",
+        laboratory: "Laboratory",
+        manager: "Management",
+      };
+      d.attendance.push({
+        id: uid(),
+        doctorId: u.id,
+        doctorName: `${u.firstName} ${u.lastName}`,
+        role: u.role,
+        department: deptMap[u.role] ?? u.role,
+        loginAt: Date.now(),
+      });
+    }
     write(d);
     return u;
   },

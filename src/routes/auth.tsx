@@ -6,7 +6,6 @@ import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { db, type Role } from "@/lib/store";
 import { useT } from "@/lib/i18n";
 
@@ -27,7 +26,11 @@ const ROLE_HOME: Record<Role, string> = {
 function Auth() {
   const navigate = useNavigate();
   const tr = useT();
-  const go = (role: Role) => navigate({ to: ROLE_HOME[role] });
+  const [mode, setMode] = useState<"login" | "register">("login");
+
+  const handleLoginSuccess = (role: Role) => {
+    navigate({ to: ROLE_HOME[role] });
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -37,18 +40,12 @@ function Auth() {
           <h1 className="text-3xl font-bold tracking-tight text-foreground">{tr("welcome")}</h1>
           <p className="mt-2 text-sm text-muted-foreground">{tr("welcome_sub")}</p>
         </div>
-        <Tabs defaultValue="patient" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="patient">{tr("patient_tab")}</TabsTrigger>
-            <TabsTrigger value="staff">{tr("staff_tab")}</TabsTrigger>
-          </TabsList>
-          <TabsContent value="patient" className="mt-6">
-            <PatientForms onSuccess={() => go("patient")} />
-          </TabsContent>
-          <TabsContent value="staff" className="mt-6">
-            <StaffLogin onSuccess={(r) => go(r)} />
-          </TabsContent>
-        </Tabs>
+
+        {mode === "login" ? (
+          <UnifiedLogin onSuccess={handleLoginSuccess} onSwitchToRegister={() => setMode("register")} />
+        ) : (
+          <PatientRegister onSuccess={handleLoginSuccess} onSwitchToLogin={() => setMode("login")} />
+        )}
       </main>
     </div>
   );

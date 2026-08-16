@@ -45,8 +45,13 @@ function LabPage() {
     <div className="min-h-screen bg-background">
       <Header />
       <main className="mx-auto max-w-4xl px-4 py-10">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">{tr("lab_title")}</h1>
-        <p className="mt-2 text-muted-foreground">{tr("lab_desc")}</p>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">{tr("lab_title")}</h1>
+            <p className="mt-2 text-muted-foreground">{tr("lab_desc")}</p>
+          </div>
+          <Button onClick={exportPdf} variant="outline" className="border-accent text-accent hover:bg-accent/10"><Download className="mr-2 h-4 w-4" /> {tr("export_pdf")}</Button>
+        </div>
         <div className="mt-8 overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
           <table className="w-full text-sm">
             <thead className="bg-secondary text-left text-muted-foreground">
