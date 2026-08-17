@@ -46,9 +46,6 @@ function DispenseTab() {
   const queue = useDb((d) => d.queue?.filter((t: any) => t.status === "pharmacy") ?? []);
   return (
     <div className="grid gap-4">
-      <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-700">
-        ℹ️ Only patients who have <strong>already paid</strong> appear here. Payment is done by the patient on their dashboard before arriving at this counter.
-      </div>
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
         <table className="w-full text-sm">
           <thead className="bg-secondary text-left text-muted-foreground">

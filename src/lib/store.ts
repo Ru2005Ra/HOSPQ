@@ -49,10 +49,21 @@ export interface LabTestCatalogItem {
   departmentCode: "LB";
 }
 
+export interface LabTestResult {
+  testId: string;
+  name: string;
+  result: string;
+  unit?: string;
+  normalRange?: string;
+  enteredAt?: number;
+}
+
 export interface RequestedLabTest {
   testId: string;
   name: string;
   status: "requested" | "done";
+  requestedByDoctorId?: string;
+  requestedByDoctorName?: string;
 }
 
 export interface QueueTicket {
@@ -78,6 +89,7 @@ export interface QueueTicket {
   paidAmount?: number;
   dispensedAt?: number;
   labRequestedTests?: RequestedLabTest[];
+  labResults?: LabTestResult[];
 }
 
 
@@ -379,17 +391,24 @@ export const db = {
   },
   labTests: () => read().labTests,
 
-  sendToLab(ticketId: string, labTests: { testId: string }[]) {
+  sendToLab(ticketId: string, doctorId: string, labTests: { testId: string }[]) {
     const d = read();
     const t = d.queue.find(x => x.id === ticketId);
-    if (!t) return;
+    const doctor = d.users.find(x => x.id === doctorId && x.role === "doctor");
+    if (!t || !doctor) return;
 
     const catalog = d.labTests;
     const requested: RequestedLabTest[] = (labTests ?? [])
       .map(it => {
         const cat = catalog.find(x => x.id === it.testId);
         if (!cat) return null;
-        return { testId: cat.id, name: cat.name, status: "requested" as const };
+        return { 
+          testId: cat.id, 
+          name: cat.name, 
+          status: "requested" as const,
+          requestedByDoctorId: doctorId,
+          requestedByDoctorName: `${doctor.firstName} ${doctor.lastName}`
+        };
       })
       .filter(Boolean) as RequestedLabTest[];
 
@@ -474,6 +493,21 @@ export const db = {
     write(d);
   },
 
+  enterLabResult(ticketId: string, result: LabTestResult) {
+    const d = read();
+    const t = d.queue.find(x => x.id === ticketId);
+    if (!t) return;
+    
+    if (!t.labResults) t.labResults = [];
+    const existing = t.labResults.findIndex(r => r.testId === result.testId);
+    if (existing >= 0) {
+      t.labResults[existing] = { ...result, enteredAt: Date.now() };
+    } else {
+      t.labResults.push({ ...result, enteredAt: Date.now() });
+    }
+    write(d);
+  },
+
   updatePatientLocation(patientId: string, location: { province: string; district: string; sector: string; village: string }) {
     const d = read();
     const u = d.users.find(x => x.id === patientId);
@@ -482,6 +516,17 @@ export const db = {
     u.district = location.district;
     u.sector = location.sector;
     u.village = location.village;
+    write(d);
+  },
+
+  passPatientToDoctor(ticketId: string, doctorId: string) {
+    const d = read();
+    const ticket = d.queue.find(x => x.id === ticketId);
+    const doctor = d.users.find(x => x.id === doctorId && x.role === "doctor");
+    if (!ticket || !doctor) return;
+    ticket.status = "with-doctor";
+    ticket.assignedDoctorId = doctorId;
+    ticket.assignedDoctorName = `${doctor.firstName} ${doctor.lastName}`;
     write(d);
   },
   recordPayment(ticketId: string, amount: number) {

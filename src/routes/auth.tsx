@@ -37,8 +37,8 @@ function Auth() {
       <Header />
       <main className="mx-auto grid max-w-md gap-6 px-4 py-12">
         <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">{tr("welcome")}</h1>
-          <p className="mt-2 text-sm text-muted-foreground">{tr("welcome_sub")}</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Skip the line.</h1>
+          <p className="mt-1 text-base text-muted-foreground">Get back to your day.</p>
         </div>
 
         {mode === "login" ? (
@@ -51,249 +51,53 @@ function Auth() {
   );
 }
 
-function PatientForms({ onSuccess }: { onSuccess: () => void }) {
-  const [mode, setMode] = useState<"register" | "login">("register");
+// Unified login component that handles both staff and patient logins
+function UnifiedLogin({ onSuccess, onSwitchToRegister }: { onSuccess: (r: Role) => void; onSwitchToRegister: () => void }) {
   const tr = useT();
-  return (
-    <div className="rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-      <div className="mb-4 flex gap-2 text-sm">
-        <button onClick={() => setMode("register")} className={mode === "register" ? "font-semibold text-accent" : "text-muted-foreground hover:text-foreground"}>{tr("new_patient")}</button>
-        <span className="text-muted-foreground">·</span>
-        <button onClick={() => setMode("login")} className={mode === "login" ? "font-semibold text-accent" : "text-muted-foreground hover:text-foreground"}>{tr("existing_patient")}</button>
-      </div>
-      {mode === "register" ? <Register onSuccess={onSuccess} /> : <Login onSuccess={onSuccess} />}
-    </div>
-  );
-}
-
-function validatePhone(carrier: string, phone: string) {
-  if (!/^\d{9}$/.test(phone)) return false;
-  if (carrier === "MTN") return /^(78|79)/.test(phone);
-  if (carrier === "Airtel") return /^(72|73)/.test(phone);
-  return false;
-}
-
-function Register({ onSuccess }: { onSuccess: () => void }) {
-  const tr = useT();
-  const [f, setF] = useState({ firstName: "", lastName: "", sex: "female" as "male" | "female", carrier: "MTN", phone: "", password: "" });
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
-  const submit = (e: React.FormEvent) => {
+  const [forgotMode, setForgotMode] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validatePhone(f.carrier, f.phone)) return toast.error("Phone must be 9 digits and start with 78/79 for MTN or 72/73 for Airtel.");
-    if (f.password.length < 6) return toast.error(tr("password_error"));
+    setIsLoading(true);
     try {
-      db.registerPatient({ firstName: f.firstName.trim(), lastName: f.lastName.trim(), phone: `+250${f.phone}`, password: f.password, sex: f.sex });
-      toast.success(tr("welcome_msg"));
-      onSuccess();
-    } catch (e: any) { toast.error(e.message); }
+      // Try staff login first (username-based)
+      const user = db.login(username.trim(), password);
+      toast.success(`${tr("welcome_back")}, ${user.firstName}`);
+      onSuccess(user.role);
+    } catch (staffError: any) {
+      // If staff login fails, show error
+      toast.error(staffError.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
-  return (
-    <form onSubmit={submit} className="grid gap-4">
-      <div className="grid grid-cols-2 gap-3">
-        <div><Label>{tr("first_name")}</Label><Input required value={f.firstName} onChange={e => setF({ ...f, firstName: e.target.value })} /></div>
-        <div><Label>{tr("last_name")}</Label><Input required value={f.lastName} onChange={e => setF({ ...f, lastName: e.target.value })} /></div>
-      </div>
-      <div>
-        <Label>{tr("sex")}</Label>
-        <div className="mt-1 flex gap-4">
-          {(["female", "male"] as const).map(s => (
-            <label key={s} className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="register_sex"
-                value={s}
-                checked={f.sex === s}
-                onChange={() => setF({ ...f, sex: s })}
-                className="accent-accent"
-              />
-              <span className="text-sm">{tr(s as "male" | "female")}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-      <div>
-        <Label>{tr("phone")}</Label>
-        <div className="mt-1 flex gap-2">
-          <select className="rounded-md border border-input bg-background px-2 text-sm" value={f.carrier} onChange={e => setF({ ...f, carrier: e.target.value })}>
-            <option>MTN</option><option>Airtel</option>
-          </select>
-          <span className="grid place-items-center rounded-md border border-input bg-secondary px-3 text-sm font-medium">+250</span>
-          <Input required inputMode="numeric" maxLength={9} placeholder="78xxxxxxx" value={f.phone} onChange={e => setF({ ...f, phone: e.target.value.replace(/\D/g, "") })} />
-        </div>
-      </div>
-      <div>
-        <Label>{tr("password")}</Label>
-        <div className="relative mt-1">
-          <Input required type={showPass ? "text" : "password"} value={f.password} onChange={e => setF({ ...f, password: e.target.value })} />
-          <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" onClick={() => setShowPass(p => !p)}>
-            {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
-        </div>
-      </div>
-      <p className="rounded-md bg-secondary p-3 text-xs text-muted-foreground">{tr("location_note")}</p>
-      <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90">{tr("create_account")}</Button>
-    </form>
-  );
-}
 
-function Login({ onSuccess }: { onSuccess: () => void }) {
-  const tr = useT();
-  const [f, setF] = useState({ firstName: "", lastName: "", password: "" });
-  const [showPass, setShowPass] = useState(false);
-  const [forgot, setForgot] = useState(false);
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    try { db.loginPatient(f.firstName.trim(), f.lastName.trim(), f.password); toast.success(tr("welcome_back")); onSuccess(); }
-    catch (e: any) { toast.error(e.message); }
-  };
-  if (forgot) return <ForgotPasswordPatient onBack={() => setForgot(false)} />;
+  if (forgotMode) {
+    return <UnifiedForgotPassword onBack={() => setForgotMode(false)} />;
+  }
+
   return (
     <div className="rounded-xl border border-border bg-card p-8 shadow-[var(--shadow-card)]">
       {/* Header */}
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold text-foreground">Login to your account</h2>
-        <p className="mt-2 text-sm text-muted-foreground">Use your name and password. You will be taken to your patient dashboard automatically.</p>
       </div>
 
-      <form onSubmit={submit} className="space-y-5">
-        {/* Name Fields */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label className="text-sm font-semibold text-foreground">{tr("first_name")}</Label>
-            <Input
-              required
-              value={f.firstName}
-              onChange={e => setF({ ...f, firstName: e.target.value })}
-              className="mt-2"
-              placeholder="First name"
-            />
-          </div>
-          <div>
-            <Label className="text-sm font-semibold text-foreground">{tr("last_name")}</Label>
-            <Input
-              required
-              value={f.lastName}
-              onChange={e => setF({ ...f, lastName: e.target.value })}
-              className="mt-2"
-              placeholder="Last name"
-            />
-          </div>
-        </div>
-
-        {/* Password Field */}
-        <div>
-          <Label className="text-sm font-semibold text-foreground">{tr("password")}</Label>
-          <div className="relative mt-2">
-            <Input
-              required
-              type={showPass ? "text" : "password"}
-              value={f.password}
-              onChange={e => setF({ ...f, password: e.target.value })}
-              placeholder="Enter your password"
-            />
-            <button
-              type="button"
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              onClick={() => setShowPass(p => !p)}
-            >
-              {showPass ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-            </button>
-          </div>
-        </div>
-
-        {/* Forgot Password Link */}
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => setForgot(true)}
-            className="text-sm text-accent hover:underline font-medium"
-          >
-            Forgot password?
-          </button>
-        </div>
-
-        {/* Login Button */}
-        <Button
-          type="submit"
-          className="w-full bg-accent text-accent-foreground hover:bg-accent/90 py-2.5 font-semibold text-base"
-        >
-          {tr("login")}
-        </Button>
-      </form>
-    </div>
-  );
-}
-
-function ForgotPasswordPatient({ onBack }: { onBack: () => void }) {
-  const [f, setF] = useState({ firstName: "", lastName: "", phone: "", newPassword: "", confirm: "" });
-  const [showPass, setShowPass] = useState(false);
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (f.newPassword !== f.confirm) return toast.error("Passwords do not match");
-    try { db.resetPatientPassword(f.firstName.trim(), f.lastName.trim(), f.phone, f.newPassword); toast.success("Password reset successfully"); onBack(); }
-    catch (e: any) { toast.error(e.message); }
-  };
-  return (
-    <form onSubmit={submit} className="grid gap-4">
-      <p className="text-sm font-medium">Reset your password</p>
-      <div className="grid grid-cols-2 gap-3">
-        <div><Label>First name</Label><Input required value={f.firstName} onChange={e => setF({ ...f, firstName: e.target.value })} /></div>
-        <div><Label>Last name</Label><Input required value={f.lastName} onChange={e => setF({ ...f, lastName: e.target.value })} /></div>
-      </div>
-      <div>
-        <Label>Phone (+250)</Label>
-        <div className="mt-1 flex gap-2">
-          <span className="grid place-items-center rounded-md border border-input bg-secondary px-3 text-sm font-medium">+250</span>
-          <Input required inputMode="numeric" maxLength={9} placeholder="78xxxxxxx" value={f.phone} onChange={e => setF({ ...f, phone: e.target.value.replace(/\D/g, "") })} />
-        </div>
-      </div>
-      <div>
-        <Label>New password</Label>
-        <div className="relative mt-1">
-          <Input required type={showPass ? "text" : "password"} value={f.newPassword} onChange={e => setF({ ...f, newPassword: e.target.value })} />
-          <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" onClick={() => setShowPass(p => !p)}>
-            {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
-        </div>
-      </div>
-      <div><Label>Confirm password</Label><Input required type="password" value={f.confirm} onChange={e => setF({ ...f, confirm: e.target.value })} /></div>
-      <div className="flex gap-2">
-        <Button type="button" variant="outline" className="flex-1" onClick={onBack}>Back</Button>
-        <Button type="submit" className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90">Reset password</Button>
-      </div>
-    </form>
-  );
-}
-
-function StaffLogin({ onSuccess }: { onSuccess: (r: Role) => void }) {
-  const tr = useT();
-  const [f, setF] = useState({ username: "", password: "" });
-  const [showPass, setShowPass] = useState(false);
-  const [forgot, setForgot] = useState(false);
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    try { const u = db.loginStaff(f.username.trim(), f.password); toast.success(`${tr("welcome_back")}, ${u.firstName}`); onSuccess(u.role); }
-    catch (e: any) { toast.error(e.message); }
-  };
-  if (forgot) return <ForgotPasswordStaff onBack={() => setForgot(false)} />;
-  return (
-    <form onSubmit={submit} className="rounded-xl border border-border bg-card p-8 shadow-[var(--shadow-card)]">
-      {/* Header */}
-      <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold text-foreground">Login to your account</h2>
-        <p className="mt-2 text-sm text-muted-foreground">Use your username and password. You will be taken to the right dashboard automatically.</p>
-      </div>
-
-      <div className="space-y-5">
+      <form onSubmit={handleLogin} className="space-y-5">
         {/* Username Field */}
         <div>
-          <Label className="text-sm font-semibold text-foreground">{tr("username")}</Label>
+          <Label className="text-sm font-semibold text-foreground">Username</Label>
           <Input
             required
-            value={f.username}
-            onChange={e => setF({ ...f, username: e.target.value })}
+            autoComplete="username"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
             className="mt-2"
-            placeholder="Enter your username"
+            placeholder=""
           />
         </div>
 
@@ -303,10 +107,11 @@ function StaffLogin({ onSuccess }: { onSuccess: (r: Role) => void }) {
           <div className="relative mt-2">
             <Input
               required
+              autoComplete="current-password"
               type={showPass ? "text" : "password"}
-              value={f.password}
-              onChange={e => setF({ ...f, password: e.target.value })}
-              placeholder="Enter your password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder=""
             />
             <button
               type="button"
@@ -322,7 +127,7 @@ function StaffLogin({ onSuccess }: { onSuccess: (r: Role) => void }) {
         <div className="flex justify-end">
           <button
             type="button"
-            onClick={() => setForgot(true)}
+            onClick={() => setForgotMode(true)}
             className="text-sm text-accent hover:underline font-medium"
           >
             Forgot password?
@@ -332,64 +137,488 @@ function StaffLogin({ onSuccess }: { onSuccess: (r: Role) => void }) {
         {/* Login Button */}
         <Button
           type="submit"
+          disabled={isLoading}
           className="w-full bg-accent text-accent-foreground hover:bg-accent/90 py-2.5 font-semibold text-base"
         >
-          {tr("login")}
+          {isLoading ? "Logging in..." : "Login"}
         </Button>
+      </form>
 
-        {/* New Account Section */}
-        <div className="text-center pt-2">
-          <p className="text-sm text-muted-foreground">
-            New to HospiQ?{" "}
-            <button type="button" className="text-accent hover:underline font-semibold">
-              Create a new account
-            </button>
-          </p>
-        </div>
+      {/* Divider */}
+      <div className="my-6 flex items-center gap-3">
+        <div className="flex-1 h-px bg-border" />
+        <span className="text-xs text-muted-foreground">New to HospiQ?</span>
+        <div className="flex-1 h-px bg-border" />
       </div>
 
-      {/* Demo Credentials */}
-      <div className="mt-8 pt-6 border-t border-border text-center">
-        <p className="text-xs text-blue-600 font-medium">
-          Demo: <span className="font-mono">reception/reception123</span>, <span className="font-mono">doctor/doctor123</span>,{" "}
-          <span className="font-mono">pharmacy/pharmacy123</span>, <span className="font-mono">manager/manager123</span>, <span className="font-mono">lab/lab123</span>
-        </p>
-      </div>
-    </form>
+      {/* Create Account Section */}
+      <button
+        type="button"
+        onClick={onSwitchToRegister}
+        className="w-full py-2.5 px-4 rounded-lg border border-border text-foreground font-semibold hover:bg-secondary transition-colors"
+      >
+        Create a new account
+      </button>
+    </div>
   );
 }
 
-function ForgotPasswordStaff({ onBack }: { onBack: () => void }) {
-  const [f, setF] = useState({ username: "", firstName: "", lastName: "", newPassword: "", confirm: "" });
+// Patient registration component
+function PatientRegister({ onSuccess, onSwitchToLogin }: { onSuccess: (r: Role) => void; onSwitchToLogin: () => void }) {
+  const tr = useT();
+  const [form, setForm] = useState({
+    username: "",
+    firstName: "",
+    lastName: "",
+    sex: "female" as "male" | "female",
+    carrier: "MTN",
+    phone: "",
+    password: "",
+    confirmPassword: "",
+  });
   const [showPass, setShowPass] = useState(false);
-  const submit = (e: React.FormEvent) => {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (f.newPassword !== f.confirm) return toast.error("Passwords do not match");
-    try { db.resetStaffPassword(f.username.trim(), f.firstName.trim(), f.lastName.trim(), f.newPassword); toast.success("Password reset successfully"); onBack(); }
-    catch (e: any) { toast.error(e.message); }
+    
+    if (!form.username.trim()) {
+      return toast.error("Username is required");
+    }
+
+    if (!form.firstName.trim() || !form.lastName.trim()) {
+      return toast.error("First and last names are required");
+    }
+
+    if (!validatePhone(form.carrier, form.phone)) {
+      return toast.error("Phone must be 9 digits and start with 78/79 for MTN or 72/73 for Airtel.");
+    }
+
+    if (form.password.length < 6) {
+      return toast.error("Password must be at least 6 characters");
+    }
+
+    if (form.password !== form.confirmPassword) {
+      return toast.error("Passwords do not match");
+    }
+
+    setIsLoading(true);
+    try {
+      db.registerPatient({
+        username: form.username.trim(),
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        phone: `+250${form.phone}`,
+        password: form.password,
+        sex: form.sex,
+      });
+      toast.success("Account created successfully! Logging you in...");
+      
+      // Auto-login after registration using username and password
+      const user = db.login(form.username.trim(), form.password);
+      onSuccess(user.role);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
   return (
-    <form onSubmit={submit} className="grid gap-4 rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-      <p className="text-sm font-medium">Reset your password</p>
-      <div><Label>Username</Label><Input required value={f.username} onChange={e => setF({ ...f, username: e.target.value })} /></div>
-      <div className="grid grid-cols-2 gap-3">
-        <div><Label>First name</Label><Input required value={f.firstName} onChange={e => setF({ ...f, firstName: e.target.value })} /></div>
-        <div><Label>Last name</Label><Input required value={f.lastName} onChange={e => setF({ ...f, lastName: e.target.value })} /></div>
+    <div className="rounded-xl border border-border bg-card p-8 shadow-[var(--shadow-card)]">
+      {/* Header */}
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-bold text-foreground">Create a new account</h2>
       </div>
-      <div>
-        <Label>New password</Label>
-        <div className="relative mt-1">
-          <Input required type={showPass ? "text" : "password"} value={f.newPassword} onChange={e => setF({ ...f, newPassword: e.target.value })} />
-          <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" onClick={() => setShowPass(p => !p)}>
-            {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
+
+      <form onSubmit={handleRegister} className="space-y-5">
+        {/* Username Field */}
+        <div>
+          <Label className="text-sm font-semibold text-foreground">Username</Label>
+          <Input
+            required
+            value={form.username}
+            onChange={e => setForm({ ...form, username: e.target.value })}
+            className="mt-2"
+            placeholder=""
+          />
         </div>
+
+        {/* Name Fields */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label className="text-sm font-semibold text-foreground">{tr("first_name")}</Label>
+            <Input
+              required
+              value={form.firstName}
+              onChange={e => setForm({ ...form, firstName: e.target.value })}
+              className="mt-2"
+              placeholder=""
+            />
+          </div>
+          <div>
+            <Label className="text-sm font-semibold text-foreground">{tr("last_name")}</Label>
+            <Input
+              required
+              value={form.lastName}
+              onChange={e => setForm({ ...form, lastName: e.target.value })}
+              className="mt-2"
+              placeholder=""
+            />
+          </div>
+        </div>
+
+        {/* Gender */}
+        <div>
+          <Label className="text-sm font-semibold text-foreground">{tr("sex")}</Label>
+          <div className="mt-2 flex gap-4">
+            {(["female", "male"] as const).map(s => (
+              <label key={s} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="register_sex"
+                  value={s}
+                  checked={form.sex === s}
+                  onChange={() => setForm({ ...form, sex: s })}
+                  className="accent-accent"
+                />
+                <span className="text-sm capitalize">{s}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Phone */}
+        <div>
+          <Label className="text-sm font-semibold text-foreground">{tr("phone")}</Label>
+          <div className="mt-2 flex gap-2">
+            <select
+              className="rounded-md border border-input bg-background px-3 text-sm font-medium"
+              value={form.carrier}
+              onChange={e => setForm({ ...form, carrier: e.target.value })}
+            >
+              <option>MTN</option>
+              <option>Airtel</option>
+            </select>
+            <span className="grid place-items-center rounded-md border border-input bg-secondary px-3 text-sm font-medium text-muted-foreground">
+              +250
+            </span>
+            <Input
+              required
+              inputMode="numeric"
+              maxLength={9}
+              placeholder=""
+              value={form.phone}
+              onChange={e => setForm({ ...form, phone: e.target.value.replace(/\D/g, "") })}
+            />
+          </div>
+        </div>
+
+        {/* Password */}
+        <div>
+          <Label className="text-sm font-semibold text-foreground">{tr("password")}</Label>
+          <div className="relative mt-2">
+            <Input
+              required
+              type={showPass ? "text" : "password"}
+              value={form.password}
+              onChange={e => setForm({ ...form, password: e.target.value })}
+              placeholder=""
+            />
+            <button
+              type="button"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              onClick={() => setShowPass(p => !p)}
+            >
+              {showPass ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Confirm Password */}
+        <div>
+          <Label className="text-sm font-semibold text-foreground">Confirm Password</Label>
+          <Input
+            required
+            type="password"
+            value={form.confirmPassword}
+            onChange={e => setForm({ ...form, confirmPassword: e.target.value })}
+            className="mt-2"
+            placeholder=""
+          />
+        </div>
+
+        {/* Create Account Button */}
+        <Button
+          type="submit"
+          disabled={isLoading}
+          className="w-full bg-accent text-accent-foreground hover:bg-accent/90 py-2.5 font-semibold text-base"
+        >
+          {isLoading ? "Creating account..." : "Create account"}
+        </Button>
+      </form>
+
+      {/* Divider */}
+      <div className="my-6 flex items-center gap-3">
+        <div className="flex-1 h-px bg-border" />
+        <span className="text-xs text-muted-foreground">Already have an account?</span>
+        <div className="flex-1 h-px bg-border" />
       </div>
-      <div><Label>Confirm password</Label><Input required type="password" value={f.confirm} onChange={e => setF({ ...f, confirm: e.target.value })} /></div>
-      <div className="flex gap-2">
-        <Button type="button" variant="outline" className="flex-1" onClick={onBack}>Back</Button>
-        <Button type="submit" className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90">Reset password</Button>
-      </div>
-    </form>
+
+      {/* Login Link */}
+      <button
+        type="button"
+        onClick={onSwitchToLogin}
+        className="w-full py-2.5 px-4 rounded-lg border border-border text-foreground font-semibold hover:bg-secondary transition-colors"
+      >
+        Login instead
+      </button>
+    </div>
   );
+}
+
+// Unified forgot password handler
+function UnifiedForgotPassword({ onBack }: { onBack: () => void }) {
+  const [mode, setMode] = useState<"staff" | "patient">("staff");
+  const [staffForm, setStaffForm] = useState({ username: "", firstName: "", lastName: "", newPassword: "", confirm: "" });
+  const [patientForm, setPatientForm] = useState({ firstName: "", lastName: "", phone: "", newPassword: "", confirm: "" });
+  const [showPass, setShowPass] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleStaffReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (staffForm.newPassword !== staffForm.confirm) return toast.error("Passwords do not match");
+    
+    setIsLoading(true);
+    try {
+      db.resetStaffPassword(
+        staffForm.username.trim(),
+        staffForm.firstName.trim(),
+        staffForm.lastName.trim(),
+        staffForm.newPassword
+      );
+      toast.success("Password reset successfully!");
+      onBack();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePatientReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (patientForm.newPassword !== patientForm.confirm) return toast.error("Passwords do not match");
+    
+    setIsLoading(true);
+    try {
+      db.resetPatientPassword(
+        patientForm.firstName.trim(),
+        patientForm.lastName.trim(),
+        patientForm.phone,
+        patientForm.newPassword
+      );
+      toast.success("Password reset successfully!");
+      onBack();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-8 shadow-[var(--shadow-card)]">
+      {/* Header */}
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-bold text-foreground">Reset your password</h2>
+        <p className="mt-2 text-sm text-muted-foreground">Select your account type to reset your password.</p>
+      </div>
+
+      {/* Mode Tabs */}
+      <div className="flex gap-2 mb-6">
+        <button
+          onClick={() => setMode("staff")}
+          className={`flex-1 py-2 px-3 rounded-lg font-medium transition-colors ${
+            mode === "staff" ? "bg-accent text-accent-foreground" : "bg-secondary text-foreground hover:bg-secondary/80"
+          }`}
+        >
+          Staff
+        </button>
+        <button
+          onClick={() => setMode("patient")}
+          className={`flex-1 py-2 px-3 rounded-lg font-medium transition-colors ${
+            mode === "patient" ? "bg-accent text-accent-foreground" : "bg-secondary text-foreground hover:bg-secondary/80"
+          }`}
+        >
+          Patient
+        </button>
+      </div>
+
+      {/* Staff Reset Form */}
+      {mode === "staff" && (
+        <form onSubmit={handleStaffReset} className="space-y-4">
+          <div>
+            <Label>Username</Label>
+            <Input
+              required
+              value={staffForm.username}
+              onChange={e => setStaffForm({ ...staffForm, username: e.target.value })}
+              className="mt-2"
+              placeholder=""
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>First name</Label>
+              <Input
+                required
+                value={staffForm.firstName}
+                onChange={e => setStaffForm({ ...staffForm, firstName: e.target.value })}
+                className="mt-2"
+                placeholder=""
+              />
+            </div>
+            <div>
+              <Label>Last name</Label>
+              <Input
+                required
+                value={staffForm.lastName}
+                onChange={e => setStaffForm({ ...staffForm, lastName: e.target.value })}
+                className="mt-2"
+                placeholder=""
+              />
+            </div>
+          </div>
+          <div>
+            <Label>New password</Label>
+            <div className="relative mt-2">
+              <Input
+                required
+                type={showPass ? "text" : "password"}
+                value={staffForm.newPassword}
+                onChange={e => setStaffForm({ ...staffForm, newPassword: e.target.value })}
+                placeholder=""
+              />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowPass(p => !p)}
+              >
+                {showPass ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
+          </div>
+          <div>
+            <Label>Confirm password</Label>
+            <Input
+              required
+              type="password"
+              value={staffForm.confirm}
+              onChange={e => setStaffForm({ ...staffForm, confirm: e.target.value })}
+              className="mt-2"
+              placeholder=""
+            />
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={onBack} disabled={isLoading}>
+              Back
+            </Button>
+            <Button type="submit" className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90" disabled={isLoading}>
+              {isLoading ? "Resetting..." : "Reset password"}
+            </Button>
+          </div>
+        </form>
+      )}
+
+      {/* Patient Reset Form */}
+      {mode === "patient" && (
+        <form onSubmit={handlePatientReset} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>First name</Label>
+              <Input
+                required
+                value={patientForm.firstName}
+                onChange={e => setPatientForm({ ...patientForm, firstName: e.target.value })}
+                className="mt-2"
+                placeholder=""
+              />
+            </div>
+            <div>
+              <Label>Last name</Label>
+              <Input
+                required
+                value={patientForm.lastName}
+                onChange={e => setPatientForm({ ...patientForm, lastName: e.target.value })}
+                className="mt-2"
+                placeholder=""
+              />
+            </div>
+          </div>
+          <div>
+            <Label>Phone (+250)</Label>
+            <div className="mt-2 flex gap-2">
+              <span className="grid place-items-center rounded-md border border-input bg-secondary px-3 text-sm font-medium text-muted-foreground">
+                +250
+              </span>
+              <Input
+                required
+                inputMode="numeric"
+                maxLength={9}
+                placeholder=""
+                value={patientForm.phone}
+                onChange={e => setPatientForm({ ...patientForm, phone: e.target.value.replace(/\D/g, "") })}
+              />
+            </div>
+          </div>
+          <div>
+            <Label>New password</Label>
+            <div className="relative mt-2">
+              <Input
+                required
+                type={showPass ? "text" : "password"}
+                value={patientForm.newPassword}
+                onChange={e => setPatientForm({ ...patientForm, newPassword: e.target.value })}
+                placeholder=""
+              />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowPass(p => !p)}
+              >
+                {showPass ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
+          </div>
+          <div>
+            <Label>Confirm password</Label>
+            <Input
+              required
+              type="password"
+              value={patientForm.confirm}
+              onChange={e => setPatientForm({ ...patientForm, confirm: e.target.value })}
+              className="mt-2"
+              placeholder=""
+            />
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={onBack} disabled={isLoading}>
+              Back
+            </Button>
+            <Button type="submit" className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90" disabled={isLoading}>
+              {isLoading ? "Resetting..." : "Reset password"}
+            </Button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
+function validatePhone(carrier: string, phone: string) {
+  if (!/^\d{9}$/.test(phone)) return false;
+  if (carrier === "MTN") return /^(78|79)/.test(phone);
+  if (carrier === "Airtel") return /^(72|73)/.test(phone);
+  return false;
 }

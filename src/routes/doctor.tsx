@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useDb } from "@/lib/hooks";
+import { useDb, useAuth } from "@/lib/hooks";
 import { db } from "@/lib/store";
 import { Trash2, Download } from "lucide-react";
 import { useT } from "@/lib/i18n";
@@ -23,6 +23,7 @@ interface Line { medicineId?: string; name: string; qty: number; price: number; 
 
 function Page() {
   const tr = useT();
+  const { user } = useAuth();
   const current = useDb((d) => d.queue?.find((t: any) => t.status === "with-doctor") ?? null);
   const meds = useDb((d) => d.medicines ?? []);
   const waiting = useDb((d) => d.queue?.filter((t: any) => t.status === "waiting").length ?? 0);
@@ -31,6 +32,7 @@ function Page() {
   const [note, setNote] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
   const [selectedTests, setSelectedTests] = useState<string[]>([]);
+  const [showLabModal, setShowLabModal] = useState(false);
   const labCatalog = useDb((d) => d.labTests ?? []);
 
   const exportPdf = () => {
@@ -79,8 +81,20 @@ function Page() {
 
   const sendToLab = () => {
     if (!current) return;
-    db.sendToLab(current.id);
-    toast.success(tr("sent_to_lab"));
+    setShowLabModal(true);
+  };
+
+  const submitLabRequest = () => {
+    if (!current || !user) return;
+    if (selectedTests.length === 0) {
+      toast.error("Please select at least one test");
+      return;
+    }
+    const tests = selectedTests.map(testId => ({ testId }));
+    db.sendToLab(current.id, user.id, tests);
+    toast.success("Patient sent to laboratory");
+    setShowLabModal(false);
+    setSelectedTests([]);
     reset();
   };
 
@@ -112,9 +126,9 @@ function Page() {
                 <h2 className="text-xl font-semibold text-foreground">{current.patientName} <span className="ml-2 rounded-full bg-primary px-3 py-1 text-sm text-primary-foreground">#{current.token}</span></h2>
                 <p className="text-xs text-muted-foreground">{tr("insurance_col")}: {current.insurance}</p>
                 <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
-                  <Vital label={tr("weight")} value={`${current.vitals.weight} kg`} />
-                  <Vital label={tr("temp")} value={`${current.vitals.temperature} °C`} />
-                  <Vital label={tr("bp")} value={current.vitals.bloodPressure || "—"} />
+                  <Vital label={tr("weight")} value={current.vitals?.weight ? `${current.vitals.weight} kg` : "—"} />
+                  <Vital label={tr("temp")} value={current.vitals?.temperature ? `${current.vitals.temperature} °C` : "—"} />
+                  <Vital label={tr("bp")} value={current.vitals?.bloodPressure ? current.vitals.bloodPressure : "—"} />
                 </div>
               </div>
 
@@ -165,6 +179,7 @@ function Page() {
             </aside>
           </div>
         )}
+        {showLabModal && <LabTestModal ticketId={current?.id || ""} labCatalog={labCatalog} selectedTests={selectedTests} setSelectedTests={setSelectedTests} onSubmit={submitLabRequest} onClose={() => setShowLabModal(false)} />}
       </main>
     </div>
   );
@@ -172,4 +187,52 @@ function Page() {
 
 function Vital({ label, value }: { label: string; value: string }) {
   return <div className="rounded-md bg-secondary p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="text-base font-semibold text-foreground">{value}</p></div>;
+}
+
+interface LabTestModalProps {
+  ticketId: string;
+  labCatalog: any[];
+  selectedTests: string[];
+  setSelectedTests: (tests: string[]) => void;
+  onSubmit: () => void;
+  onClose: () => void;
+}
+
+function LabTestModal({ labCatalog, selectedTests, setSelectedTests, onSubmit, onClose }: LabTestModalProps) {
+  const tr = useT();
+  
+  const toggleTest = (testId: string) => {
+    setSelectedTests(
+      selectedTests.includes(testId)
+        ? selectedTests.filter(id => id !== testId)
+        : [...selectedTests, testId]
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-lg max-h-80 overflow-y-auto">
+        <h2 className="text-lg font-semibold mb-4">{tr("send_to_lab")}</h2>
+        <div className="space-y-2 mb-4">
+          {labCatalog.map((test: any) => (
+            <label key={test.id} className="flex items-center gap-3 p-2 rounded hover:bg-secondary cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedTests.includes(test.id)}
+                onChange={() => toggleTest(test.id)}
+                className="w-4 h-4"
+              />
+              <span className="text-sm">{test.name}</span>
+            </label>
+          ))}
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="outline" onClick={onClose}>Cancel</Button>
+          <Button size="sm" onClick={onSubmit} disabled={selectedTests.length === 0} className="bg-blue-600 text-white hover:bg-blue-700">
+            Send to Lab
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }

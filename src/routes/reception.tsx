@@ -23,6 +23,7 @@ function Page() {
   const today = queue.filter((t: any) => t.createdAt > Date.now() - 24 * 3600 * 1000);
   const [modal, setModal] = useState<{ patientId: string; ticketId: string } | null>(null);
   const [emergency, setEmergency] = useState<{ ticketId: string; description: string } | null>(null);
+  const [passDoctor, setPassDoctor] = useState<{ ticketId: string; ticketName: string; ticketDept: string } | null>(null);
 
   const exportPdf = () => {
     const doc = new jsPDF();
@@ -107,6 +108,7 @@ function Page() {
                   <td className="p-3 text-muted-foreground text-xs">{vitalsFor(t.id)}</td>
                   <td className="p-3 text-right space-x-2">
                     <Button size="sm" variant="outline" onClick={() => setModal({ patientId: t.patientId, ticketId: t.id })}>{tr("edit_info")}</Button>
+                    <Button size="sm" variant="outline" onClick={() => setPassDoctor({ ticketId: t.id, ticketName: t.patientName, ticketDept: t.department })}>Pass to Doctor</Button>
                     <Button size="sm" variant="outline" onClick={() => setEmergency({ ticketId: t.id, description: "" })}>{tr("triage")}</Button>
                     <Button size="sm" variant="outline" onClick={() => { db.removeTicket(t.id); toast.success(tr("token_removed")); }}>{tr("remove")}</Button>
                   </td>
@@ -118,6 +120,7 @@ function Page() {
 
         {modal && <EditModal {...modal} onClose={() => setModal(null)} />}
         {emergency && <EmergencyModal {...emergency} onClose={() => setEmergency(null)} />}
+        {passDoctor && <PassDoctorModal {...passDoctor} onClose={() => setPassDoctor(null)} />}
       </main>
     </div>
   );
@@ -195,6 +198,57 @@ function Stat({ label, value }: { label: string; value: number | string }) {
     <div className="rounded-xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
       <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-2 text-3xl font-bold text-foreground">{value}</p>
+    </div>
+  );
+}
+
+function PassDoctorModal({ ticketId, ticketName, ticketDept, onClose }: { ticketId: string; ticketName: string; ticketDept: string; onClose: () => void }) {
+  const tr = useT();
+  const [selectedDoctor, setSelectedDoctor] = useState<string>("");
+  const doctors = db.all().users.filter((u: any) => u.role === "doctor") as any[];
+
+  const assignDoctor = () => {
+    if (!selectedDoctor) {
+      toast.error("Please select a doctor");
+      return;
+    }
+    db.passPatientToDoctor(ticketId, selectedDoctor);
+    const doctor = doctors.find(d => d.id === selectedDoctor);
+    toast.success(`Patient ${ticketName} passed to Dr. ${doctor?.firstName} ${doctor?.lastName}`);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-lg">
+        <h2 className="text-lg font-semibold mb-2">Pass Patient to Doctor</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          <span className="font-medium">{ticketName}</span> - {ticketDept}
+        </p>
+        
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-2">Select Doctor</label>
+          <select
+            value={selectedDoctor}
+            onChange={e => setSelectedDoctor(e.target.value)}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          >
+            <option value="">-- Choose a doctor --</option>
+            {doctors.map(doc => (
+              <option key={doc.id} value={doc.id}>
+                Dr. {doc.firstName} {doc.lastName}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="outline" onClick={onClose}>Cancel</Button>
+          <Button size="sm" onClick={assignDoctor} className="bg-accent text-accent-foreground hover:bg-accent/90">
+            Pass to Doctor
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

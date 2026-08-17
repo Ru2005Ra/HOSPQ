@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth, useDb, fmtDuration, fmtDurationWithSeconds } from "@/lib/hooks";
 import { db, DEPARTMENTS, type QueueTicket } from "@/lib/store";
 import { getProvinces, getDistricts, getSectors, getVillages } from "@/lib/locations";
-import { Clock3, Pill, Receipt, ShieldPlus, MapPin, CheckCheck, X, Loader2 } from "lucide-react";
+import { Clock3, Pill, Receipt, MapPin, CheckCheck, X, Loader2 } from "lucide-react";
 import { useT } from "@/lib/i18n";
 
 export const Route = createFileRoute("/patient")({
@@ -17,15 +17,6 @@ export const Route = createFileRoute("/patient")({
 });
 
 const INSURERS = ["Mutuelle de Santé", "MMI", "RSSB", "RAMA", "Radiant", "Other / Cash"];
-
-const FIRST_AID_TIPS = [
-  { icon: "💧", tip: "Stay hydrated — drink water while you wait." },
-  { icon: "🧘", tip: "Stay calm and seated. Stress can raise blood pressure." },
-  { icon: "🚫", tip: "Do not eat heavy meals before seeing the doctor." },
-  { icon: "📋", tip: "Prepare to describe your symptoms clearly to the doctor." },
-  { icon: "💊", tip: "If you take regular medication, have the names ready." },
-  { icon: "🩺", tip: "Note when your symptoms started and how severe they are." },
-];
 
 const NEARBY_PHARMACIES = [
   { name: "Kigali Health Pharmacy", province: "Kigali", district: "Gasabo", sector: "Kimironko", address: "KG 14 Ave, Kimironko", phone: "+250 788 123 456" },
@@ -228,9 +219,6 @@ function StartVisit() {
           {INSURERS.map(i => <option key={i}>{i}</option>)}
         </select>
       </div>
-      <p className="rounded-md bg-blue-50 border border-blue-200 p-3 text-xs text-blue-700">
-        ℹ️ Vitals (weight, temperature, blood pressure) will be measured by reception when you arrive at the desk.
-      </p>
       <div className="flex gap-3">
         <Button type="button" variant="outline" onClick={() => setStep("location")}>{tr("cancel")}</Button>
         <Button type="submit" className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90">{tr("get_my_token")}</Button>
@@ -243,8 +231,6 @@ function ActiveVisit({ ticket }: { ticket: QueueTicket }) {
   return (
     <div className="mt-8 grid gap-6">
       <TokenCard ticket={ticket} />
-      <StatusMessage ticket={ticket} />
-      {ticket.status === "waiting" && <FirstAidTips />}
       <VisitStagesTable ticket={ticket} />
       {ticket.status === "paying" && <PaymentPanel ticketId={ticket.id} />}
       {ticket.status === "pharmacy" && <PharmacyPanel ticket={ticket} />}
@@ -294,59 +280,8 @@ function TokenCard({ ticket }: { ticket: QueueTicket }) {
   );
 }
 
-function StatusMessage({ ticket }: { ticket: QueueTicket }) {
-  const messages: Record<string, { before: string; after: string; color: string }> = {
-    waiting: {
-      before: "📍 You are currently waiting. Please stay near the reception desk and listen for your token number to be called.",
-      after: "✅ Once reception calls your token, they will record your vitals and confirm your insurance. Then you will be sent to the doctor.",
-      color: "border-blue-200 bg-blue-50 text-blue-800",
-    },
-    "with-doctor": {
-      before: "🩺 You are now with the doctor. Please describe your symptoms clearly and honestly.",
-      after: "✅ After the consultation, the doctor will write your diagnosis and prescription. You will then proceed to payment.",
-      color: "border-green-200 bg-green-50 text-green-800",
-    },
-    paying: {
-      before: "💳 Your consultation is complete. Please pay for your medicines below.",
-      after: "✅ After payment, go to the pharmacy counter with your token to collect your medicines.",
-      color: "border-yellow-200 bg-yellow-50 text-yellow-800",
-    },
-    pharmacy: {
-      before: "💊 Head to the pharmacy counter and show your token number to collect your medicines.",
-      after: "✅ Once you receive your medicines, your visit will be marked as complete. Feel better soon!",
-      color: "border-purple-200 bg-purple-50 text-purple-800",
-    },
-  };
 
-  const msg = messages[ticket.status];
-  if (!msg) return null;
 
-  return (
-    <div className={`rounded-xl border p-4 text-sm ${msg.color}`}>
-      <p className="font-semibold">{msg.before}</p>
-      <p className="mt-2 opacity-80">{msg.after}</p>
-    </div>
-  );
-}
-
-function FirstAidTips() {
-  return (
-    <div className="rounded-xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
-      <div className="flex items-center gap-2 mb-4">
-        <ShieldPlus className="h-5 w-5 text-accent" />
-        <h2 className="text-base font-semibold text-foreground">While You Wait — First Aid Tips</h2>
-      </div>
-      <div className="grid gap-2 sm:grid-cols-2">
-        {FIRST_AID_TIPS.map((t, i) => (
-          <div key={i} className="flex items-start gap-2 rounded-lg bg-secondary px-3 py-2 text-sm text-muted-foreground">
-            <span className="text-base">{t.icon}</span>
-            <span>{t.tip}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function VisitStagesTable({ ticket }: { ticket: QueueTicket }) {
   const stages = [
@@ -467,17 +402,6 @@ function PaymentPanel({ ticketId }: { ticketId: string }) {
                   <span className="text-lg font-bold text-accent">{total.toLocaleString()} RWF</span>
                 </div>
               </div>
-
-              {hasTransfer && (
-                <p className="mt-4 rounded-md bg-orange-50 border border-orange-200 p-3 text-xs text-orange-700">
-                  ⚠️ Some medicines are out of stock and must be purchased at an outside pharmacy.
-                </p>
-              )}
-              {total === 0 && (
-                <p className="mt-4 rounded-md bg-green-50 border border-green-200 p-3 text-xs text-green-700">
-                  ✅ No payment required — all medicines are transfer items.
-                </p>
-              )}
             </>
           )}
         </div>
@@ -557,14 +481,10 @@ function PharmacyPanel({ ticket }: { ticket: QueueTicket }) {
       <div className="text-center mb-6">
         <Pill className="mx-auto h-10 w-10 text-accent" />
         <h2 className="mt-3 text-xl font-semibold text-foreground">{tr("head_pharmacy")}</h2>
-        <p className="mt-2 text-sm text-muted-foreground">{tr("pharmacy_note")}</p>
       </div>
 
       {transferItems.length > 0 ? (
         <div className="space-y-4">
-          <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm text-orange-700">
-            ⚠️ Some prescribed medicines are not available at the hospital pharmacy. Here are nearby pharmacies where you can buy them yourself.
-          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             {shownPharmacies.map((ph) => (
               <div key={ph.name} className="rounded-xl border border-border bg-secondary p-4">
