@@ -1,3 +1,5 @@
+import { getSupabaseClient, isSupabaseReady } from "@/lib/supabase";
+
 export type Role = "patient" | "doctor" | "manager" | "reception" | "laboratory" | "storekeeper";
 
 export interface Room {
@@ -200,7 +202,141 @@ function read(): DB {
 
 function write(db: DB) {
   localStorage.setItem(KEY, JSON.stringify(db));
+  syncDbToSupabase(db);
   window.dispatchEvent(new Event("hospiq:change"));
+}
+
+function syncDbToSupabase(db: DB) {
+  if (!isSupabaseReady || typeof window === "undefined") return;
+
+  const client = getSupabaseClient();
+
+  void client
+    .from("users")
+    .upsert(
+      db.users.map((u) => ({
+        id: u.id,
+        role: u.role,
+        first_name: u.firstName,
+        last_name: u.lastName,
+        username: u.username ?? null,
+        phone: u.phone ?? null,
+        password: u.password,
+        sex: u.sex ?? null,
+        insurance: u.insurance ?? null,
+        province: u.province ?? null,
+        district: u.district ?? null,
+        sector: u.sector ?? null,
+        village: u.village ?? null,
+        department_codes: u.departmentCodes ?? [],
+      })),
+      { onConflict: "id" },
+    )
+    .then(() => undefined)
+    .catch((error) => console.error("Supabase users sync failed", error));
+
+  void client
+    .from("medicines")
+    .upsert(
+      db.medicines.map((m) => ({
+        id: m.id,
+        name: m.name,
+        stock: m.stock,
+        price: m.price,
+      })),
+      { onConflict: "id" },
+    )
+    .then(() => undefined)
+    .catch((error) => console.error("Supabase medicines sync failed", error));
+
+  void client
+    .from("lab_tests")
+    .upsert(
+      db.labTests.map((test) => ({
+        id: test.id,
+        name: test.name,
+        description: test.description ?? null,
+        department_code: test.departmentCode,
+      })),
+      { onConflict: "id" },
+    )
+    .then(() => undefined)
+    .catch((error) => console.error("Supabase lab tests sync failed", error));
+
+  void client
+    .from("rooms")
+    .upsert(
+      db.rooms.map((room) => ({
+        id: room.id,
+        name: room.name,
+        department_code: room.departmentCode,
+      })),
+      { onConflict: "id" },
+    )
+    .then(() => undefined)
+    .catch((error) => console.error("Supabase rooms sync failed", error));
+
+  void client
+    .from("queue_tickets")
+    .upsert(
+      db.queue.map((ticket) => ({
+        id: ticket.id,
+        patient_id: ticket.patientId,
+        patient_name: ticket.patientName,
+        insurance: ticket.insurance ?? null,
+        vitals: ticket.vitals ?? {},
+        token: ticket.token,
+        department: ticket.department,
+        department_code: ticket.departmentCode,
+        created_at: ticket.createdAt,
+        status: ticket.status,
+        assigned_doctor_id: ticket.assignedDoctorId ?? null,
+        assigned_doctor_name: ticket.assignedDoctorName ?? null,
+        diagnosis: ticket.diagnosis ?? null,
+        doctor_note: ticket.doctorNote ?? null,
+        paid: ticket.paid ?? false,
+        paid_amount: ticket.paidAmount ?? 0,
+        dispensed_at: ticket.dispensedAt ?? null,
+        lab_requested_tests: ticket.labRequestedTests ?? [],
+        lab_results: ticket.labResults ?? [],
+        prescription: ticket.prescription ?? [],
+      })),
+      { onConflict: "id" },
+    )
+    .then(() => undefined)
+    .catch((error) => console.error("Supabase queue sync failed", error));
+
+  void client
+    .from("attendance")
+    .upsert(
+      db.attendance.map((item) => ({
+        id: item.id,
+        doctor_id: item.doctorId,
+        doctor_name: item.doctorName,
+        role: item.role,
+        department: item.department,
+        login_at: item.loginAt,
+        logout_at: item.logoutAt ?? null,
+      })),
+      { onConflict: "id" },
+    )
+    .then(() => undefined)
+    .catch((error) => console.error("Supabase attendance sync failed", error));
+
+  void client
+    .from("reports")
+    .upsert(
+      db.reports.map((report) => ({
+        id: report.id,
+        user_id: report.userId,
+        role: report.role,
+        content: report.content,
+        created_at: report.createdAt,
+      })),
+      { onConflict: "id" },
+    )
+    .then(() => undefined)
+    .catch((error) => console.error("Supabase reports sync failed", error));
 }
 
 export const db = {
