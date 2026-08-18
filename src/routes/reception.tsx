@@ -180,10 +180,29 @@ function EditModal({ patientId, ticketId, onClose }: { patientId: string; ticket
     }
 
     db.updatePatientLocation(patientId, { province, district, sector, village });
-    if (insurance) { const u = db.all().users.find((x: any) => x.id === patientId); if (u) u.insurance = insurance; }
-    if (ticket) ticket.vitals = { ...(ticket.vitals ?? {}), weight: cleanWeight, temperature: cleanTemperature, bloodPressure: cleanBp };
+    if (insurance) {
+      const u = db.all().users.find((x: any) => x.id === patientId);
+      if (u) u.insurance = insurance;
+      writePatientInsurance(patientId, insurance);
+    }
+    if (ticket) {
+      db.updateTicketVitals(ticketId, {
+        weight: cleanWeight,
+        temperature: cleanTemperature,
+        bloodPressure: cleanBp,
+      });
+    }
     toast.success(tr("patient_updated"));
     onClose();
+  };
+
+  const writePatientInsurance = (id: string, value: string) => {
+    const d = db.all();
+    const u = d.users.find((x: any) => x.id === id);
+    if (!u) return;
+    u.insurance = value;
+    localStorage.setItem("hospiq_v1", JSON.stringify(d));
+    window.dispatchEvent(new Event("hospiq:change"));
   };
 
   const cls = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
@@ -249,6 +268,11 @@ function PassDoctorModal({ ticketId, ticketName, ticketDept, onClose }: { ticket
   const assignDoctor = () => {
     if (!selectedDoctor) {
       toast.error("Please select a doctor");
+      return;
+    }
+    const ticket = db.all().queue.find((t: any) => t.id === ticketId);
+    if (!ticket || !ticket.vitals || !ticket.vitals.weight || !ticket.vitals.temperature || !ticket.vitals.bloodPressure) {
+      toast.error("This patient must wait until reception records weight, temperature, and blood pressure.");
       return;
     }
     db.passPatientToDoctor(ticketId, selectedDoctor);

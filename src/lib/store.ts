@@ -143,6 +143,31 @@ function normalizeVitals(vitals?: Partial<Vitals>): Vitals {
   };
 }
 
+export function hasCompleteVitals(vitals?: Partial<Vitals>): boolean {
+  const weight = String(vitals?.weight ?? "").trim();
+  const temperature = String(vitals?.temperature ?? "").trim();
+  const bloodPressure = String(vitals?.bloodPressure ?? "").trim();
+
+  if (!weight || !temperature || !bloodPressure) return false;
+
+  const weightValue = Number(weight);
+  const tempValue = Number(temperature);
+  const normalizedBp = bloodPressure.replace(/\s*mmHg\s*/i, "").trim();
+  const bpMatch = /^\d{2,3}\/\d{2,3}$/.test(normalizedBp);
+  if (!bpMatch) return false;
+
+  const [sys, dia] = normalizedBp.split("/").map(Number);
+  if (
+    Number.isNaN(weightValue) || weightValue < 20 || weightValue > 250 ||
+    Number.isNaN(tempValue) || tempValue < 30 || tempValue > 45 ||
+    Number.isNaN(sys) || Number.isNaN(dia) || sys < 60 || sys > 220 || dia < 30 || dia > 120
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
 interface DB {
   users: User[];
   queue: QueueTicket[];
@@ -501,7 +526,7 @@ export const db = {
     const d = read();
 
     const next = d.queue
-      .filter(t => t.status === "waiting" && t.departmentCode !== "LB")
+      .filter(t => t.status === "waiting" && t.departmentCode !== "LB" && hasCompleteVitals(t.vitals))
       .sort((a, b) => a.createdAt - b.createdAt)[0];
 
     if (!next) return null;
@@ -676,11 +701,20 @@ export const db = {
     write(d);
   },
 
+  updateTicketVitals(ticketId: string, vitals: Partial<Vitals>) {
+    const d = read();
+    const t = d.queue.find(x => x.id === ticketId);
+    if (!t) return;
+    t.vitals = normalizeVitals({ ...t.vitals, ...vitals });
+    write(d);
+  },
+
   passPatientToDoctor(ticketId: string, doctorId: string) {
     const d = read();
     const ticket = d.queue.find(x => x.id === ticketId);
     const doctor = d.users.find(x => x.id === doctorId && x.role === "doctor");
     if (!ticket || !doctor) return;
+    if (!hasCompleteVitals(ticket.vitals)) return;
     ticket.status = "with-doctor";
     ticket.assignedDoctorId = doctorId;
     ticket.assignedDoctorName = `${doctor.firstName} ${doctor.lastName}`;

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth, useDb, fmtDuration, fmtDurationWithSeconds } from "@/lib/hooks";
-import { db, DEPARTMENTS, type QueueTicket } from "@/lib/store";
+import { db, DEPARTMENTS, hasCompleteVitals, type QueueTicket } from "@/lib/store";
 import { getProvinces, getDistricts, getSectors, getVillages } from "@/lib/locations";
 import { Clock3, Pill, Receipt, MapPin, CheckCheck, X, Loader2 } from "lucide-react";
 import { useT } from "@/lib/i18n";
@@ -32,6 +32,7 @@ function PatientHome() {
   const tr = useT();
   const ticket = useDb((d) => (user ? d.queue?.find((t: any) => t.patientId === user.id && t.status !== "done" && t.status !== "removed") ?? null : null));
   const [lastStatus, setLastStatus] = useState<string | null>(null);
+  const vitalsPending = !!ticket && !hasCompleteVitals(ticket.vitals);
 
   useEffect(() => {
     if (ready && (!user || user.role !== "patient")) navigate({ to: "/auth" });
@@ -42,8 +43,9 @@ function PatientHome() {
     if (ticket.status === lastStatus) return;
     setLastStatus(ticket.status);
     const room = DEPARTMENTS.find(d => d.code === ticket.departmentCode)?.room ?? "consultation room";
+    const doctorName = ticket.assignedDoctorName ? `Dr. ${ticket.assignedDoctorName}` : "the selected doctor";
     if (ticket.status === "waiting") toast(`✅ Token ${ticket.token} ready — head to reception desk.`);
-    if (ticket.status === "with-doctor") toast(`🩺 Doctor is ready. Please go to ${room}.`);
+    if (ticket.status === "with-doctor") toast(`🩺 ${doctorName} is ready. Please go to ${room}.`);
     if (ticket.status === "paying") toast(`💳 Consultation done. Please pay at the cashier.`);
     if (ticket.status === "pharmacy") toast(`💊 Go to pharmacy to collect your medicines.`);
     if (ticket.status === "done") toast(`🎉 Visit complete. Thank you for using HospiQ!`);
@@ -51,12 +53,26 @@ function PatientHome() {
 
   if (!user || user.role !== "patient") return null;
 
+  const roomMessage = ticket && ticket.assignedDoctorName && ticket.status === "waiting"
+    ? `Assigned doctor: Dr. ${ticket.assignedDoctorName}. Please wait in the ${DEPARTMENTS.find(d => d.code === ticket.departmentCode)?.room ?? "consultation room"}.`
+    : null;
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <main className="mx-auto max-w-3xl px-4 py-10">
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{tr("hi")} {user.firstName} 👋</h1>
         <p className="mt-2 text-muted-foreground">{tr("manage_visit")}</p>
+        {vitalsPending && (
+          <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm">
+            Please wait at reception. Your weight, temperature, and blood pressure must be recorded before you can move forward.
+          </div>
+        )}
+        {roomMessage && (
+          <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm">
+            {roomMessage}
+          </div>
+        )}
         {!ticket && <StartVisit />}
         {ticket && <ActiveVisit ticket={ticket} />}
       </main>
