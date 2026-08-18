@@ -61,7 +61,11 @@ function Page() {
   const vitalsFor = (ticketId: string) => {
     const t = db.all().queue.find((x: any) => x.id === ticketId);
     if (!t) return "-";
-    return `W: ${t.vitals.weight}kg, T: ${t.vitals.temperature}°C, BP: ${t.vitals.bloodPressure}`;
+    const v = t.vitals ?? {};
+    const weight = v.weight ?? "—";
+    const temp = v.temperature ?? "—";
+    const bp = v.bloodPressure ?? "—";
+    return `W: ${weight}kg, T: ${temp}°C, BP: ${bp}`;
   };
 
   return (
@@ -135,14 +139,49 @@ function EditModal({ patientId, ticketId, onClose }: { patientId: string; ticket
   const [sector, setSector] = useState(patient?.sector || "");
   const [village, setVillage] = useState(patient?.village || "");
   const [insurance, setInsurance] = useState(patient?.insurance || "");
-  const [weight, setWeight] = useState(ticket?.vitals.weight || "");
-  const [temperature, setTemperature] = useState(ticket?.vitals.temperature || "");
-  const [bloodPressure, setBloodPressure] = useState(ticket?.vitals.bloodPressure || "");
+  const currentVitals = ticket?.vitals ?? {};
+  const [weight, setWeight] = useState(currentVitals.weight ?? "");
+  const [temperature, setTemperature] = useState(currentVitals.temperature ?? "");
+  const [bloodPressure, setBloodPressure] = useState(currentVitals.bloodPressure ?? "");
 
   const save = () => {
+    const cleanWeight = weight.trim();
+    const cleanTemperature = temperature.trim();
+    const cleanBp = bloodPressure.trim();
+
+    if (cleanWeight) {
+      const w = Number(cleanWeight);
+      if (Number.isNaN(w) || w < 20 || w > 250) {
+        toast.error("Weight should be between 20 kg and 250 kg.");
+        return;
+      }
+    }
+
+    if (cleanTemperature) {
+      const t = Number(cleanTemperature);
+      if (Number.isNaN(t) || t < 30 || t > 45) {
+        toast.error("Temperature should be between 30°C and 45°C.");
+        return;
+      }
+    }
+
+    if (cleanBp) {
+      const normalized = cleanBp.replace(/\s*mmHg\s*/i, "").trim();
+      const matches = /^\d{2,3}\/\d{2,3}$/.test(normalized);
+      if (!matches) {
+        toast.error("BP should look like 120/80 or 140/90.");
+        return;
+      }
+      const [sys, dia] = normalized.split("/").map(Number);
+      if (Number.isNaN(sys) || Number.isNaN(dia) || sys < 60 || sys > 220 || dia < 30 || dia > 120) {
+        toast.error("BP values should be realistic, for example 120/80.");
+        return;
+      }
+    }
+
     db.updatePatientLocation(patientId, { province, district, sector, village });
     if (insurance) { const u = db.all().users.find((x: any) => x.id === patientId); if (u) u.insurance = insurance; }
-    if (ticket) ticket.vitals = { weight, temperature, bloodPressure };
+    if (ticket) ticket.vitals = { ...(ticket.vitals ?? {}), weight: cleanWeight, temperature: cleanTemperature, bloodPressure: cleanBp };
     toast.success(tr("patient_updated"));
     onClose();
   };
@@ -158,9 +197,9 @@ function EditModal({ patientId, ticketId, onClose }: { patientId: string; ticket
           <input className={cls} placeholder={tr("sector")} value={sector} onChange={e => setSector(e.target.value)} />
           <input className={cls} placeholder={tr("village")} value={village} onChange={e => setVillage(e.target.value)} />
           <input className={cls} placeholder={tr("insurance_col")} value={insurance} onChange={e => setInsurance(e.target.value)} />
-          <input className={cls} placeholder={tr("weight")} value={weight} onChange={e => setWeight(e.target.value)} />
-          <input className={cls} placeholder={tr("temp")} value={temperature} onChange={e => setTemperature(e.target.value)} />
-          <input className={cls} placeholder={tr("bp")} value={bloodPressure} onChange={e => setBloodPressure(e.target.value)} />
+          <input type="number" min={20} max={250} step="0.1" className={cls} placeholder={tr("weight")} value={weight} onChange={e => setWeight(e.target.value)} />
+          <input type="number" min={30} max={45} step="0.1" className={cls} placeholder={tr("temp")} value={temperature} onChange={e => setTemperature(e.target.value)} />
+          <input className={cls} placeholder="120/80 mmHg" value={bloodPressure} onChange={e => setBloodPressure(e.target.value)} />
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <Button size="sm" variant="outline" onClick={onClose}>{tr("cancel")}</Button>

@@ -1,29 +1,38 @@
 create extension if not exists pgcrypto;
 
-create type public.user_role as enum (
-  'patient',
-  'doctor',
-  'manager',
-  'reception',
-  'laboratory',
-  'storekeeper'
-);
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
+    CREATE TYPE public.user_role AS ENUM (
+      'patient',
+      'doctor',
+      'manager',
+      'reception',
+      'laboratory',
+      'storekeeper'
+    );
+  END IF;
 
-create type public.ticket_status as enum (
-  'waiting',
-  'with-doctor',
-  'paying',
-  'pharmacy',
-  'done',
-  'removed'
-);
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ticket_status') THEN
+    CREATE TYPE public.ticket_status AS ENUM (
+      'waiting',
+      'with-doctor',
+      'paying',
+      'pharmacy',
+      'done',
+      'removed'
+    );
+  END IF;
 
-create type public.request_status as enum (
-  'requested',
-  'done'
-);
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'request_status') THEN
+    CREATE TYPE public.request_status AS ENUM (
+      'requested',
+      'done'
+    );
+  END IF;
+END $$;
 
-create table public.users (
+create table if not exists public.users (
   id uuid primary key default gen_random_uuid(),
   role public.user_role not null,
   first_name text not null,
@@ -43,14 +52,14 @@ create table public.users (
   unique(username)
 );
 
-create table public.rooms (
+create table if not exists public.rooms (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   department_code text not null,
   created_at timestamptz default now()
 );
 
-create table public.lab_tests (
+create table if not exists public.lab_tests (
   id text primary key,
   name text not null,
   description text,
@@ -58,7 +67,7 @@ create table public.lab_tests (
   created_at timestamptz default now()
 );
 
-create table public.medicines (
+create table if not exists public.medicines (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   stock integer not null default 0,
@@ -66,7 +75,7 @@ create table public.medicines (
   created_at timestamptz default now()
 );
 
-create table public.queue_tickets (
+create table if not exists public.queue_tickets (
   id uuid primary key default gen_random_uuid(),
   patient_id uuid not null references public.users(id) on delete cascade,
   patient_name text not null,
@@ -89,7 +98,7 @@ create table public.queue_tickets (
   prescription jsonb default '[]'::jsonb
 );
 
-create table public.attendance (
+create table if not exists public.attendance (
   id uuid primary key default gen_random_uuid(),
   doctor_id uuid not null references public.users(id) on delete cascade,
   doctor_name text not null,
@@ -100,7 +109,7 @@ create table public.attendance (
   created_at timestamptz default now()
 );
 
-create table public.reports (
+create table if not exists public.reports (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.users(id) on delete cascade,
   role public.user_role not null,
@@ -109,12 +118,12 @@ create table public.reports (
   created_at_dt timestamptz default now()
 );
 
-create index idx_users_role on public.users(role);
-create index idx_users_username on public.users(username);
-create index idx_queue_tickets_status on public.queue_tickets(status);
-create index idx_queue_tickets_department on public.queue_tickets(department_code);
-create index idx_queue_tickets_patient on public.queue_tickets(patient_id);
-create index idx_attendance_doctor on public.attendance(doctor_id);
+create index if not exists idx_users_role on public.users(role);
+create index if not exists idx_users_username on public.users(username);
+create index if not exists idx_queue_tickets_status on public.queue_tickets(status);
+create index if not exists idx_queue_tickets_department on public.queue_tickets(department_code);
+create index if not exists idx_queue_tickets_patient on public.queue_tickets(patient_id);
+create index if not exists idx_attendance_doctor on public.attendance(doctor_id);
 
 -- Seed default staff users to mirror the current frontend behavior.
 insert into public.users (role, first_name, last_name, username, password, department_codes)
@@ -153,6 +162,14 @@ alter table public.queue_tickets enable row level security;
 alter table public.attendance enable row level security;
 alter table public.reports enable row level security;
 
+drop policy if exists "Allow all authenticated access" on public.users;
+drop policy if exists "Allow all authenticated access" on public.rooms;
+drop policy if exists "Allow all authenticated access" on public.lab_tests;
+drop policy if exists "Allow all authenticated access" on public.medicines;
+drop policy if exists "Allow all authenticated access" on public.queue_tickets;
+drop policy if exists "Allow all authenticated access" on public.attendance;
+drop policy if exists "Allow all authenticated access" on public.reports;
+
 create policy "Allow all authenticated access" on public.users
 for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
@@ -173,3 +190,9 @@ for all using (auth.role() = 'authenticated') with check (auth.role() = 'authent
 
 create policy "Allow all authenticated access" on public.reports
 for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
+    CREATE TYPE public.user_role AS ENUM (...);
+  END IF;
+END $$;

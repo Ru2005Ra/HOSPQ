@@ -90,6 +90,7 @@ export interface QueueTicket {
   paid?: boolean;
   paidAmount?: number;
   dispensedAt?: number;
+  returnDepartmentCode?: string;
   labRequestedTests?: RequestedLabTest[];
   labResults?: LabTestResult[];
 }
@@ -132,6 +133,15 @@ export interface AttendanceEntry {
 }
 
 const KEY = "hospiq_v1";
+
+function normalizeVitals(vitals?: Partial<Vitals>): Vitals {
+  return {
+    weight: vitals?.weight ?? "",
+    temperature: vitals?.temperature ?? "",
+    bloodPressure: vitals?.bloodPressure ?? "",
+    notes: vitals?.notes ?? "",
+  };
+}
 
 interface DB {
   users: User[];
@@ -464,7 +474,7 @@ export const db = {
       patientId: patient.id,
       patientName: `${patient.firstName} ${patient.lastName}`,
       insurance,
-      vitals,
+      vitals: normalizeVitals(vitals),
       token,
       department: dept.name,
       departmentCode: dept.code,
@@ -549,6 +559,7 @@ export const db = {
       .filter(Boolean) as RequestedLabTest[];
 
     t.labRequestedTests = requested;
+    t.returnDepartmentCode = t.returnDepartmentCode ?? t.departmentCode;
     t.departmentCode = "LB";
     t.department = "Laboratory";
     t.status = "waiting";
@@ -633,7 +644,7 @@ export const db = {
     const d = read();
     const t = d.queue.find(x => x.id === ticketId);
     if (!t) return;
-    
+
     if (!t.labResults) t.labResults = [];
     const existing = t.labResults.findIndex(r => r.testId === result.testId);
     if (existing >= 0) {
@@ -641,6 +652,16 @@ export const db = {
     } else {
       t.labResults.push({ ...result, enteredAt: Date.now() });
     }
+
+    if (t.labRequestedTests?.length) {
+      t.labRequestedTests = t.labRequestedTests.map(x => x.testId === result.testId ? { ...x, status: "done" } : x);
+    }
+
+    const returnCode = t.returnDepartmentCode ?? t.departmentCode;
+    const returnDept = DEPARTMENTS.find(x => x.code === returnCode);
+    t.departmentCode = returnCode;
+    t.department = returnDept?.name ?? t.department;
+    t.status = t.assignedDoctorId ? "with-doctor" : "waiting";
     write(d);
   },
 

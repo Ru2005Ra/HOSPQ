@@ -34,6 +34,7 @@ function Page() {
   const [selectedTests, setSelectedTests] = useState<string[]>([]);
   const [showLabModal, setShowLabModal] = useState(false);
   const labCatalog = useDb((d) => d.labTests ?? []);
+  const labResults = current?.labResults ?? [];
 
   const exportPdf = () => {
     const doc = new jsPDF();
@@ -131,6 +132,26 @@ function Page() {
                   <Vital label={tr("bp")} value={current.vitals?.bloodPressure ? current.vitals.bloodPressure : "—"} />
                 </div>
               </div>
+
+              {labResults.length > 0 && (
+                <div className="rounded-xl border border-green-200 bg-green-50 p-6 shadow-[var(--shadow-card)]">
+                  <h3 className="text-lg font-semibold text-foreground">Lab results</h3>
+                  <div className="mt-3 space-y-3">
+                    {labResults.map((result: any) => (
+                      <div key={result.testId} className="rounded-lg border border-green-200 bg-white p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-medium text-foreground">{result.name}</p>
+                          <span className="text-xs text-green-700">{result.enteredAt ? new Date(result.enteredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now"}</span>
+                        </div>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {result.result}{result.unit ? ` ${result.unit}` : ""}
+                          {result.normalRange ? ` · Normal: ${result.normalRange}` : ""}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
                 <Label>{tr("diagnosis")}</Label>
