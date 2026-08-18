@@ -1,0 +1,62 @@
+{
+  "users": [
+    {
+      "id": "u-doc",
+      "role": "doctor",
+      "firstName": "Jean",
+      "lastName": "Mugisha",
+      "username": "doctor",
+      "password": "doctor123",
+      "departmentCodes": ["DC", "EY", "EN", "MA", "PD"]
+    },
+    {
+      "id": "u-rec",
+      "role": "reception",
+      "firstName": "Aline",
+      "lastName": "Uwase",
+      "username": "reception",
+      "password": "reception123"
+    },
+    {
+      "id": "u-lab",
+      "role": "laboratory",
+      "firstName": "Lab",
+      "lastName": "Tech",
+      "username": "lab",
+      "password": "lab123"
+    },
+    {
+      "id": "u-stk",
+      "role": "storekeeper",
+      "firstName": "Eric",
+      "lastName": "Nshimiyimana",
+      "username": "pharmacy",
+      "password": "pharmacy123"
+    },
+    {
+      "id": "u-mgr",
+      "role": "manager",
+      "firstName": "Claire",
+      "lastName": "Ingabire",
+      "username": "manager",
+      "password": "manager123"
+    }
+  ],
+  "queue": [],
+  "medicines": [
+    { "id": "med-1", "name": "Paracetamol 500mg", "stock": 120, "price": 500 },
+    { "id": "med-2", "name": "Amoxicillin 250mg", "stock": 60, "price": 1500 },
+    { "id": "med-3", "name": "Ibuprofen 200mg", "stock": 80, "price": 800 },
+    { "id": "med-4", "name": "ORS sachet", "stock": 200, "price": 300 }
+  ],
+  "labTests": [
+    { "id": "cbc", "name": "Complete Blood Count (CBC)", "description": "Blood cell counts", "departmentCode": "LB" },
+    { "id": "malaria", "name": "Malaria Rapid Test", "description": "Detection of malaria", "departmentCode": "LB" },
+    { "id": "urinalysis", "name": "Urinalysis", "description": "Urine screening", "departmentCode": "LB" },
+    { "id": "rbs", "name": "Random Blood Sugar (RBS)", "description": "Blood sugar check", "departmentCode": "LB" }
+  ],
+  "attendance": [],
+  "rooms": [],
+  "reports": [],
+  "session": null
+}
