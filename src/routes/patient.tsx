@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth, useDb, fmtDuration, fmtDurationWithSeconds } from "@/lib/hooks";
-import { db, DEPARTMENTS, hasCompleteVitals, type QueueTicket } from "@/lib/store";
+import { calculatePatientPayable, db, DEPARTMENTS, hasCompleteVitals, type QueueTicket } from "@/lib/store";
 import { getProvinces, getDistricts, getSectors, getVillages } from "@/lib/locations";
 import { Clock3, Pill, Receipt, MapPin, CheckCheck, X, Loader2 } from "lucide-react";
 import { useT } from "@/lib/i18n";
@@ -383,13 +383,14 @@ function PaymentPanel({ ticketId }: { ticketId: string }) {
 
   if (!ticket) return null;
   const total = (ticket.prescription ?? []).reduce((s: number, p: any) => s + (p.transfer ? 0 : p.price * p.qty), 0);
+  const patientPayable = calculatePatientPayable(total, ticket.insurance ?? user?.insurance);
   const hasTransfer = (ticket.prescription ?? []).some((p: any) => p.transfer);
 
   const pay = (e: React.FormEvent) => {
     e.preventDefault();
     if (`+250${phone}` !== user?.phone) return toast.error(tr("phone_mismatch"));
-    db.recordPayment(ticketId, total);
-    toast.success("✅ Payment confirmed! Head to the pharmacy counter.");
+    db.recordPayment(ticketId, patientPayable);
+    toast.success(`Payment confirmed: ${patientPayable.toLocaleString()} RWF. Head to the pharmacy counter.`);
   };
 
   return (
@@ -431,7 +432,7 @@ function PaymentPanel({ ticketId }: { ticketId: string }) {
               <div className="mt-4 pt-4 border-t border-border">
                 <div className="flex justify-between items-center">
                   <span className="font-semibold text-foreground">Total</span>
-                  <span className="text-lg font-bold text-accent">{total.toLocaleString()} RWF</span>
+                  <span className="text-lg font-bold text-accent">{patientPayable.toLocaleString()} RWF</span>
                 </div>
               </div>
             </>
@@ -447,7 +448,7 @@ function PaymentPanel({ ticketId }: { ticketId: string }) {
             <h3 className="text-lg font-semibold text-foreground">{tr("pay_mobile")}</h3>
           </div>
           <p className="text-sm text-muted-foreground mb-5">
-            Enter your registered phone number to confirm payment of <strong>{total.toLocaleString()} RWF</strong>.
+            Enter your registered phone number to confirm payment of <strong>{patientPayable.toLocaleString()} RWF</strong>.
           </p>
 
           {/* Phone Input */}
@@ -476,7 +477,7 @@ function PaymentPanel({ ticketId }: { ticketId: string }) {
               className="mt-1 accent-accent cursor-pointer"
             />
             <label htmlFor="confirm-pay" className="text-sm text-foreground cursor-pointer">
-              I confirm I want to pay <strong>{total.toLocaleString()} RWF</strong> for my prescription medicines.
+              I confirm I want to pay <strong>{patientPayable.toLocaleString()} RWF</strong> for my prescription medicines.
             </label>
           </div>
 
@@ -486,7 +487,7 @@ function PaymentPanel({ ticketId }: { ticketId: string }) {
             disabled={!confirmed || phone.length !== 9}
             className="w-full bg-accent text-accent-foreground hover:bg-accent/90 disabled:opacity-50 font-semibold py-2"
           >
-            Pay {total.toLocaleString()} RWF
+            Pay {patientPayable.toLocaleString()} RWF
           </Button>
         </form>
       )}

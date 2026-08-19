@@ -111,7 +111,6 @@ function Page() {
                   <td className="p-3 text-muted-foreground text-xs">{vitalsFor(t.id)}</td>
                   <td className="p-3 text-right space-x-2">
                     <Button size="sm" variant="outline" onClick={() => setModal({ patientId: t.patientId, ticketId: t.id })}>{tr("edit_info")}</Button>
-                    <Button size="sm" variant="outline" onClick={() => setPassDoctor({ ticketId: t.id, ticketName: t.patientName, ticketDept: t.department })}>Pass to Doctor</Button>
                     <Button size="sm" variant="outline" onClick={() => setEmergency({ ticketId: t.id, description: "" })}>{tr("triage")}</Button>
                     <Button size="sm" variant="outline" onClick={() => { db.removeTicket(t.id); toast.success(tr("token_removed")); }}>{tr("remove")}</Button>
                   </td>
