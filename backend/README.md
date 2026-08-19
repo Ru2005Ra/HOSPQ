@@ -58,20 +58,29 @@ The current local client still uses its localStorage compatibility store and mir
 
 ## Deploy to Render
 
-1. Push this folder to GitHub.
-2. In Render, click New > Web Service.
-3. Connect the repository.
-4. Set the root directory to `backend`.
-5. Use these values:
+The repository includes `render.yaml`, so you can deploy it as a Blueprint:
+
+1. Push the repository to GitHub.
+2. In Render, choose **New > Blueprint** and select the repository.
+3. Render will detect `render.yaml` and create the `hospiq-backend` service.
+4. Enter the three Supabase secret values when Render asks for them.
+5. Deploy and copy the generated URL, for example `https://hospiq-backend.onrender.com`.
+
+For manual deployment, use these values:
+
+1. In Render, click **New > Web Service**.
+2. Connect the repository.
+3. Set the root directory to `backend`.
+4. Use these values:
    - Build Command: `npm install`
    - Start Command: `npm start`
-6. Add environment variables:
+5. Add environment variables:
    - `PORT=10000` (Render usually sets this automatically)
-   - `CORS_ORIGIN=https://your-frontend-domain.com`
+   - `CORS_ORIGIN=https://tanstack-start-app.hospquick-site.workers.dev`
    - `SUPABASE_URL=https://your-project.supabase.co`
    - `SUPABASE_ANON_KEY=...`
    - `SUPABASE_SERVICE_ROLE_KEY=...`
-7. Deploy.
+6. Deploy.
 
 ## Deploy to Railway
 
@@ -92,7 +101,7 @@ const res = await fetch('http://localhost:4000/api/queue');
 const data = await res.json();
 ```
 
-For production, use your deployed backend URL.
+For production, use your deployed backend URL and configure the frontend API base URL to that address.
 
 ## Production note
 

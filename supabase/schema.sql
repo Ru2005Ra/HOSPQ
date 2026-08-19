@@ -163,6 +163,12 @@ alter table public.queue_tickets enable row level security;
 alter table public.attendance enable row level security;
 alter table public.reports enable row level security;
 
+grant usage on schema public to anon, authenticated, service_role;
+grant all on all tables in schema public to anon, authenticated, service_role;
+grant all on all sequences in schema public to anon, authenticated, service_role;
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+
 drop policy if exists "Allow all authenticated access" on public.users;
 drop policy if exists "Allow all authenticated access" on public.rooms;
 drop policy if exists "Allow all authenticated access" on public.lab_tests;
