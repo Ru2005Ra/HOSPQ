@@ -31,6 +31,7 @@ function PatientHome() {
   const navigate = useNavigate();
   const tr = useT();
   const ticket = useDb((d) => (user ? d.queue?.find((t: any) => t.patientId === user.id && t.status !== "done" && t.status !== "removed") ?? null : null));
+  const emergencyNotice = useDb((d) => d.emergencyAlert ?? null);
   const [lastStatus, setLastStatus] = useState<string | null>(null);
   const vitalsPending = !!ticket && !hasCompleteVitals(ticket.vitals);
 
@@ -49,10 +50,14 @@ function PatientHome() {
     if (ticket.status === "paying") toast(`💳 Consultation done. Please pay at the cashier.`);
     if (ticket.status === "pharmacy") toast(`💊 Go to pharmacy to collect your medicines.`);
     if (ticket.status === "done") toast(`🎉 Visit complete. Thank you for using HospiQ!`);
-  }, [ticket, lastStatus]);
+    if (emergencyNotice && emergencyNotice.departmentCode === ticket.departmentCode && emergencyNotice.active) {
+      toast(`⚠ Emergency case in ${DEPARTMENTS.find(d => d.code === emergencyNotice.departmentCode)?.name ?? "this department"}. Please wait and stay close.`);
+    }
+  }, [ticket, lastStatus, emergencyNotice]);
 
   if (!user || user.role !== "patient") return null;
 
+  const emergencyForDepartment = !!(emergencyNotice && emergencyNotice.departmentCode === ticket?.departmentCode && emergencyNotice.active);
   const roomMessage = ticket && ticket.assignedDoctorName && ticket.status === "waiting"
     ? `Assigned doctor: Dr. ${ticket.assignedDoctorName}. Please wait in the ${DEPARTMENTS.find(d => d.code === ticket.departmentCode)?.room ?? "consultation room"}.`
     : null;
@@ -66,6 +71,11 @@ function PatientHome() {
         {vitalsPending && (
           <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm">
             Please wait at reception. Your weight, temperature, and blood pressure must be recorded before you can move forward.
+          </div>
+        )}
+        {emergencyForDepartment && (
+          <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-sm">
+            Emergency in progress in this department. Please wait for the reception team to clear the emergency case before the queue resumes.
           </div>
         )}
         {roomMessage && (
@@ -261,9 +271,15 @@ function TokenCard({ ticket }: { ticket: QueueTicket }) {
     if (!t) return 0;
     return d.queue?.filter((x: any) => x.status === "waiting" && x.createdAt < t.createdAt).length ?? 0;
   });
+  const emergencyNotice = useDb((d) => d.emergencyAlert ?? null);
   const waitMs = ahead * 5 * 60 * 1000;
   const [now, setNow] = useState(Date.now());
-  useEffect(() => { const i = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(i); }, []);
+  const emergencyPause = !!(emergencyNotice && emergencyNotice.departmentCode === ticket.departmentCode && emergencyNotice.active);
+  useEffect(() => {
+    if (emergencyPause) return;
+    const i = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(i);
+  }, [emergencyPause]);
   const deadline = useMemo(() => ticket.createdAt + waitMs, [ticket.createdAt, waitMs]);
   const remaining = Math.max(0, deadline - now);
   const green = remaining >= 5 * 60 * 1000;
@@ -286,10 +302,10 @@ function TokenCard({ ticket }: { ticket: QueueTicket }) {
           {ahead > 0 && (
             <div className="mt-3 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold ml-2"
               style={{ background: green ? "color-mix(in oklab, var(--success) 15%, transparent)" : "color-mix(in oklab, var(--destructive) 15%, transparent)", color: green ? "var(--success)" : "var(--destructive)" }}>
-              <Clock3 className="h-4 w-4" /> <span className="font-mono font-bold">{fmtDurationWithSeconds(remaining)}</span> {green ? tr("you_have_time") : tr("stay_nearby")}
+              <Clock3 className="h-4 w-4" /> <span className="font-mono font-bold">{emergencyPause ? "Paused" : fmtDurationWithSeconds(remaining)}</span> {emergencyPause ? "Emergency pause" : (green ? tr("you_have_time") : tr("stay_nearby"))}
             </div>
           )}
-          {ahead === 0 && <p className="mt-3 text-sm font-semibold text-destructive">{tr("stay_close")}</p>}
+          {ahead === 0 && <p className="mt-3 text-sm font-semibold text-destructive">{emergencyPause ? "Emergency pause — please wait" : tr("stay_close")}</p>}
         </>
       )}
     </div>

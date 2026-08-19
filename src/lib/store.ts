@@ -93,6 +93,7 @@ export interface QueueTicket {
   returnDepartmentCode?: string;
   labRequestedTests?: RequestedLabTest[];
   labResults?: LabTestResult[];
+  emergencyAlert?: { departmentCode: string; description: string; active: boolean; startedAt: number } | null;
 }
 
 
@@ -109,6 +110,21 @@ export interface DepartmentOption {
   code: string;
   description: string;
   room: string;
+}
+
+export const INSURANCE_COVERAGE: Record<string, number> = {
+  "Mutuelle de Santé": 0.8,
+  "MMI": 0.75,
+  "RSSB": 0.7,
+  "RAMA": 0.6,
+  "Radiant": 0.65,
+  "Other / Cash": 0,
+};
+
+export function calculatePatientPayable(total: number, insurance?: string) {
+  const rate = INSURANCE_COVERAGE[insurance ?? "Other / Cash"] ?? 0;
+  const payable = Math.max(0, total * (1 - rate));
+  return Math.round(payable);
 }
 
 export const DEPARTMENTS: DepartmentOption[] = [
@@ -177,6 +193,7 @@ interface DB {
   session: { userId: string; justRegistered?: boolean } | null;
   rooms: Room[];
   reports: StaffReport[];
+  emergencyAlert: { departmentCode: string; description: string; active: boolean; startedAt: number } | null;
 }
 
 
@@ -221,6 +238,7 @@ function seed(): DB {
     ],
     reports: [],
     session: null,
+    emergencyAlert: null,
   };
 }
 
@@ -524,20 +542,43 @@ export const db = {
   },
   callNext(): QueueTicket | null {
     const d = read();
-
+    const doctors = d.users.filter(u => u.role === "doctor") as User[];
     const next = d.queue
       .filter(t => t.status === "waiting" && t.departmentCode !== "LB" && hasCompleteVitals(t.vitals))
-      .sort((a, b) => a.createdAt - b.createdAt)[0];
+      .sort((a, b) => a.createdAt - b.createdAt)
+      .find(ticket => {
+        const matching = doctors.filter(doc => (doc.departmentCodes ?? []).includes(ticket.departmentCode));
+        return matching.length > 0;
+      });
 
     if (!next) return null;
 
-    const doctors = d.users.filter(u => u.role === "doctor") as User[];
     const matching = doctors.filter(doc => (doc.departmentCodes ?? []).includes(next.departmentCode));
     const assigned = matching[0] ?? doctors[0];
 
     next.status = "with-doctor";
     next.assignedDoctorId = assigned?.id;
     next.assignedDoctorName = assigned ? `${assigned.firstName} ${assigned.lastName}` : undefined;
+
+    write(d);
+    return next;
+  },
+
+  callNextForDoctor(doctorId: string): QueueTicket | null {
+    const d = read();
+    const doctor = d.users.find(u => u.id === doctorId && u.role === "doctor") as User | undefined;
+    if (!doctor) return null;
+
+    const next = d.queue
+      .filter(t => t.status === "waiting" && t.departmentCode !== "LB" && hasCompleteVitals(t.vitals) && (doctor.departmentCodes ?? []).includes(t.departmentCode))
+      .sort((a, b) => a.createdAt - b.createdAt)[0];
+
+    if (!next) return null;
+    if (next.assignedDoctorId && next.assignedDoctorId !== doctorId) return null;
+
+    next.status = "with-doctor";
+    next.assignedDoctorId = doctorId;
+    next.assignedDoctorName = `${doctor.firstName} ${doctor.lastName}`;
 
     write(d);
     return next;
@@ -646,10 +687,33 @@ export const db = {
     const d = read();
     const t = d.queue.find(x => x.id === ticketId);
     if (!t) return;
-    t.departmentCode = "MH";
-    t.department = "Emergency";
+    t.departmentCode = t.departmentCode || "MH";
+    t.department = DEPARTMENTS.find(x => x.code === t.departmentCode)?.name ?? t.department;
     t.status = "waiting";
     t.diagnosis = description;
+    t.emergencyAlert = {
+      departmentCode: t.departmentCode,
+      description,
+      active: true,
+      startedAt: Date.now(),
+    };
+    d.emergencyAlert = {
+      departmentCode: t.departmentCode,
+      description,
+      active: true,
+      startedAt: Date.now(),
+    };
+    write(d);
+  },
+
+  clearEmergency(departmentCode: string) {
+    const d = read();
+    d.emergencyAlert = null;
+    d.queue.forEach(ticket => {
+      if (ticket.departmentCode === departmentCode) {
+        ticket.emergencyAlert = null;
+      }
+    });
     write(d);
   },
   completeLabTicket(ticketId: string) {
@@ -715,6 +779,7 @@ export const db = {
     const doctor = d.users.find(x => x.id === doctorId && x.role === "doctor");
     if (!ticket || !doctor) return;
     if (!hasCompleteVitals(ticket.vitals)) return;
+    if (ticket.status === "with-doctor" && ticket.assignedDoctorId && ticket.assignedDoctorId !== doctorId) return;
     ticket.status = "with-doctor";
     ticket.assignedDoctorId = doctorId;
     ticket.assignedDoctorName = `${doctor.firstName} ${doctor.lastName}`;
@@ -726,7 +791,14 @@ export const db = {
     if (!t) return;
     t.paid = true;
     t.paidAmount = amount;
-    t.status = "pharmacy";
+    t.status = "removed";
+    d.reports.push({
+      id: uid(),
+      userId: t.patientId,
+      role: "patient",
+      content: `Patient ${t.patientName} was served in ${t.department} on ${new Date().toLocaleDateString()}. Insurance: ${t.insurance ?? "Cash"}. Amount paid: ${amount} RWF.`,
+      createdAt: Date.now(),
+    });
     write(d);
   },
   dispense(ticketId: string) {
@@ -780,7 +852,7 @@ export const db = {
   attendance: () => read().attendance,
 
   // reports
-  completedTickets: () => read().queue.filter(t => t.status === "done"),
+  completedTickets: () => read().queue.filter(t => t.status === "done" || t.status === "removed"),
 };
 
 export function subscribe(cb: () => void) {

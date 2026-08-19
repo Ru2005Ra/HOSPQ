@@ -24,10 +24,15 @@ interface Line { medicineId?: string; name: string; qty: number; price: number; 
 function Page() {
   const tr = useT();
   const { user } = useAuth();
-  const current = useDb((d) => d.queue?.find((t: any) => t.status === "with-doctor") ?? null);
+  const current = useDb((d) => (user ? d.queue?.find((t: any) => t.status === "with-doctor" && t.assignedDoctorId === user.id) ?? null : null));
   const meds = useDb((d) => d.medicines ?? []);
-  const waiting = useDb((d) => d.queue?.filter((t: any) => t.status === "waiting").length ?? 0);
-  const completed = useDb((d) => d.queue?.filter((t: any) => t.status === "done") ?? []);
+  const waiting = useDb((d) => {
+    if (!user) return 0;
+    const doctor = d.users?.find((u: any) => u.id === user.id && u.role === "doctor");
+    const codes = doctor?.departmentCodes ?? [];
+    return d.queue?.filter((t: any) => t.status === "waiting" && codes.includes(t.departmentCode)).length ?? 0;
+  });
+  const completed = useDb((d) => d.queue?.filter((t: any) => t.status === "done" || t.status === "removed") ?? []);
   const [diagnosis, setDiagnosis] = useState("");
   const [note, setNote] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
@@ -60,7 +65,8 @@ function Page() {
   const reset = () => { setDiagnosis(""); setNote(""); setLines([]); };
 
   const callNext = () => {
-    const t = db.callNext();
+    if (!user) return;
+    const t = db.callNextForDoctor(user.id);
     if (!t) return toast.info(tr("queue_empty"));
     reset();
     toast.success(`${tr("calling")} ${t.patientName} (#${t.token})`);

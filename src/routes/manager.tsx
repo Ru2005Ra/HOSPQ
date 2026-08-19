@@ -57,9 +57,11 @@ function Page() {
         <Tabs defaultValue="staff" className="mt-6">
           <TabsList>
             <TabsTrigger value="staff">Staff Management</TabsTrigger>
+            <TabsTrigger value="patients">Patients Report</TabsTrigger>
             <TabsTrigger value="attendance">{tr("attendance_tab")}</TabsTrigger>
           </TabsList>
           <TabsContent value="staff" className="mt-6"><StaffTab /></TabsContent>
+          <TabsContent value="patients" className="mt-6"><PatientsTab /></TabsContent>
           <TabsContent value="attendance" className="mt-6"><AttendanceTab /></TabsContent>
         </Tabs>
       </main>
@@ -254,6 +256,60 @@ function StaffTab() {
           <Button type="button" variant="outline" onClick={() => { setEditId(null); setF(EMPTY); }}>{tr("cancel")}</Button>
         )}
       </form>
+    </div>
+  );
+}
+
+function PatientsTab() {
+  const patients = useDb((d) => d.queue?.filter((t: any) => t.status === "done" || t.status === "removed") ?? []);
+
+  const exportPdf = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(16); doc.text("HospiQ — Patient Service Report", 14, 18);
+    doc.setFontSize(10); doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 25);
+    autoTable(doc, {
+      startY: 32,
+      head: [["Patient", "Date", "Department", "Insurance", "Status"]],
+      body: patients.map((p: any) => [
+        p.patientName,
+        new Date(p.createdAt).toLocaleDateString(),
+        p.department,
+        p.insurance ?? "Cash",
+        p.status,
+      ]),
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [15, 27, 61] },
+    });
+    doc.save(`hospiq-patients-${new Date().toISOString().slice(0, 10)}.pdf`);
+    toast.success("Patient report exported");
+  };
+
+  return (
+    <div className="grid gap-6">
+      <div className="flex justify-end">
+        <Button size="sm" onClick={exportPdf} className="bg-accent text-accent-foreground hover:bg-accent/90">
+          <Download className="mr-1 h-4 w-4" /> Export patient report
+        </Button>
+      </div>
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
+        <table className="w-full text-sm">
+          <thead className="bg-secondary text-left text-muted-foreground">
+            <tr><th className="p-3">Patient</th><th className="p-3">Date</th><th className="p-3">Department</th><th className="p-3">Insurance</th><th className="p-3">Status</th></tr>
+          </thead>
+          <tbody>
+            {patients.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No patient service records yet.</td></tr>}
+            {patients.map((p: any) => (
+              <tr key={p.id} className="border-t border-border">
+                <td className="p-3">{p.patientName}</td>
+                <td className="p-3 text-muted-foreground">{new Date(p.createdAt).toLocaleDateString()}</td>
+                <td className="p-3">{p.department}</td>
+                <td className="p-3">{p.insurance ?? "Cash"}</td>
+                <td className="p-3">{p.status}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
