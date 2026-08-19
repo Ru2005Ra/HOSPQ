@@ -191,9 +191,3 @@ for all using (auth.role() = 'authenticated') with check (auth.role() = 'authent
 
 create policy "Allow all authenticated access" on public.reports
 for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
-    CREATE TYPE public.user_role AS ENUM (...);
-  END IF;
-END $$;
