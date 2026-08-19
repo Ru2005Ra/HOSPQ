@@ -95,7 +95,8 @@ create table if not exists public.queue_tickets (
   dispensed_at bigint,
   lab_requested_tests jsonb default '[]'::jsonb,
   lab_results jsonb default '[]'::jsonb,
-  prescription jsonb default '[]'::jsonb
+  prescription jsonb default '[]'::jsonb,
+  emergency_alert jsonb
 );
 
 create table if not exists public.attendance (

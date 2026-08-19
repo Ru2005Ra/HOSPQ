@@ -8,6 +8,20 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const DATA_FILE = path.join(__dirname, 'data', 'store.json');
 
+const INSURANCE_COVERAGE = {
+  'Mutuelle de Santé': 0.8,
+  MMI: 0.75,
+  RSSB: 0.7,
+  RAMA: 0.6,
+  Radiant: 0.65,
+  'Other / Cash': 0,
+};
+
+function calculatePatientPayable(total, insurance) {
+  const coverage = INSURANCE_COVERAGE[insurance || 'Other / Cash'] || 0;
+  return Math.round(Math.max(0, Number(total || 0) * (1 - coverage)));
+}
+
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   credentials: true,
@@ -33,6 +47,7 @@ function readStore() {
       rooms: [],
       reports: [],
       session: null,
+      emergencyAlert: null,
     };
     fs.writeFileSync(DATA_FILE, JSON.stringify(fallback, null, 2));
     return fallback;
@@ -89,6 +104,11 @@ app.get('/api/users', (req, res) => {
 app.get('/api/queue', (req, res) => {
   const db = readStore();
   res.json(db.queue);
+});
+
+app.get('/api/emergency', (req, res) => {
+  const db = readStore();
+  res.json({ emergencyAlert: db.emergencyAlert || null });
 });
 
 app.get('/api/medicines', (req, res) => {
@@ -204,6 +224,14 @@ app.post('/api/queue/pass-to-doctor', (req, res) => {
     return res.status(400).json({ message: 'Vitals are incomplete. Reception must record weight, temperature, and blood pressure.' });
   }
 
+  if (!(doctor.departmentCodes || []).includes(ticket.departmentCode)) {
+    return res.status(400).json({ message: 'Doctor is not assigned to this department.' });
+  }
+
+  if (ticket.status === 'with-doctor' && ticket.assignedDoctorId && ticket.assignedDoctorId !== doctorId) {
+    return res.status(409).json({ message: 'This patient is already assigned to another doctor.' });
+  }
+
   ticket.status = 'with-doctor';
   ticket.assignedDoctorId = doctorId;
   ticket.assignedDoctorName = `${doctor.firstName} ${doctor.lastName}`;
@@ -213,19 +241,20 @@ app.post('/api/queue/pass-to-doctor', (req, res) => {
 
 app.post('/api/queue/call-next', (req, res) => {
   const db = readStore();
+  const { doctorId } = req.body;
+  const doctor = db.users.find((u) => u.id === doctorId && u.role === 'doctor');
+  if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
   const next = db.queue
-    .filter((t) => t.status === 'waiting' && t.departmentCode !== 'LB' && hasCompleteVitals(t.vitals))
+    .filter((t) => t.status === 'waiting' && t.departmentCode !== 'LB' && hasCompleteVitals(t.vitals) && (doctor.departmentCodes || []).includes(t.departmentCode))
     .sort((a, b) => a.createdAt - b.createdAt)[0];
 
   if (!next) {
     return res.status(404).json({ message: 'No eligible patient available' });
   }
 
-  const doctors = db.users.filter((u) => u.role === 'doctor');
-  const assigned = doctors.find((doc) => (doc.departmentCodes ?? []).includes(next.departmentCode)) ?? doctors[0];
   next.status = 'with-doctor';
-  next.assignedDoctorId = assigned?.id;
-  next.assignedDoctorName = assigned ? `${assigned.firstName} ${assigned.lastName}` : undefined;
+  next.assignedDoctorId = doctor.id;
+  next.assignedDoctorName = `${doctor.firstName} ${doctor.lastName}`;
 
   writeStore(db);
   res.json({ ticket: next });
@@ -348,11 +377,54 @@ app.post('/api/payment', (req, res) => {
     return res.status(404).json({ message: 'Ticket not found' });
   }
 
+  const total = (ticket.prescription || []).reduce((sum, item) => sum + (item.transfer ? 0 : Number(item.price || 0) * Number(item.qty || 0)), 0);
+  const expectedAmount = calculatePatientPayable(total, ticket.insurance);
+  if (Number(amount) !== expectedAmount) {
+    return res.status(400).json({ message: `Payment must equal the insured patient amount: ${expectedAmount} RWF`, expectedAmount });
+  }
+
   ticket.paid = true;
-  ticket.paidAmount = amount;
-  ticket.status = 'pharmacy';
+  ticket.paidAmount = expectedAmount;
+  ticket.status = 'removed';
+  db.reports.push({
+    id: uid(),
+    userId: ticket.patientId,
+    role: 'patient',
+    content: `Patient ${ticket.patientName} was served in ${ticket.department} on ${new Date().toLocaleDateString()}. Insurance: ${ticket.insurance || 'Cash'}. Amount paid: ${expectedAmount} RWF.`,
+    createdAt: Date.now(),
+  });
   writeStore(db);
   res.json({ ticket });
+});
+
+app.post('/api/emergency', (req, res) => {
+  const { ticketId, description } = req.body;
+  const db = readStore();
+  const ticket = db.queue.find((item) => item.id === ticketId);
+  if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+  const emergencyAlert = {
+    departmentCode: ticket.departmentCode,
+    description: String(description || 'Emergency case in progress'),
+    active: true,
+    startedAt: Date.now(),
+  };
+  ticket.emergencyAlert = emergencyAlert;
+  ticket.status = 'waiting';
+  db.emergencyAlert = emergencyAlert;
+  writeStore(db);
+  res.json({ ticket, emergencyAlert });
+});
+
+app.delete('/api/emergency/:departmentCode', (req, res) => {
+  const db = readStore();
+  const { departmentCode } = req.params;
+  db.emergencyAlert = null;
+  db.queue.forEach((ticket) => {
+    if (ticket.departmentCode === departmentCode) ticket.emergencyAlert = null;
+  });
+  writeStore(db);
+  res.json({ ok: true });
 });
 
 app.post('/api/dispense', (req, res) => {

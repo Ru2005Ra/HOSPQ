@@ -353,6 +353,7 @@ function syncDbToSupabase(db: DB) {
         lab_requested_tests: ticket.labRequestedTests ?? [],
         lab_results: ticket.labResults ?? [],
         prescription: ticket.prescription ?? [],
+        emergency_alert: ticket.emergencyAlert ?? null,
       })),
       { onConflict: "id" },
     )

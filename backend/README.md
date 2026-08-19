@@ -1,6 +1,6 @@
 # HospiQ Express Backend
 
-This is a simple Node + Express API for the HospiQ hospital queue app.
+This is the Node + Express API for the HospiQ hospital queue app. It runs with the JSON store for local development and is configured to use the Supabase project credentials for the online deployment setup.
 
 ## Run locally
 
@@ -43,6 +43,18 @@ http://localhost:4000
 - `POST /api/diagnosis`
 - `POST /api/payment`
 - `POST /api/dispense`
+- `GET /api/emergency`
+- `POST /api/emergency`
+- `DELETE /api/emergency/:departmentCode`
+
+## Supabase setup
+
+1. Open the Supabase SQL editor.
+2. Run [`../supabase/schema.sql`](../supabase/schema.sql), including the `emergency_alert` queue column.
+3. Copy `backend/.env.example` to `backend/.env`.
+4. Set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` from Supabase project settings. Keep the service-role key only on the backend.
+
+The current local client still uses its localStorage compatibility store and mirrors records to Supabase when the Vite variables are present. The Express API is the deployment entry point for shared online access; connect the frontend API base URL to the deployed API before publishing.
 
 ## Deploy to Render
 
@@ -56,6 +68,9 @@ http://localhost:4000
 6. Add environment variables:
    - `PORT=10000` (Render usually sets this automatically)
    - `CORS_ORIGIN=https://your-frontend-domain.com`
+   - `SUPABASE_URL=https://your-project.supabase.co`
+   - `SUPABASE_ANON_KEY=...`
+   - `SUPABASE_SERVICE_ROLE_KEY=...`
 7. Deploy.
 
 ## Deploy to Railway
@@ -81,4 +96,4 @@ For production, use your deployed backend URL.
 
 ## Production note
 
-This backend currently stores data in a JSON file. That is fine for a demo or MVP, but for a real production app you should move to PostgreSQL or MongoDB.
+Do not commit `.env` or expose `SUPABASE_SERVICE_ROLE_KEY` to the browser. The checked-in JSON store is only a local fallback; run the SQL schema and provide the Supabase environment variables before using the API for shared production data.
