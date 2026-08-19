@@ -96,6 +96,25 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, message: 'HospiQ backend is running' });
 });
 
+app.get('/api/state', (req, res) => {
+  res.json(readStore());
+});
+
+app.put('/api/state', (req, res) => {
+  const state = req.body;
+  if (!state || !Array.isArray(state.users) || !Array.isArray(state.queue)) {
+    return res.status(400).json({ message: 'Invalid HospiQ state' });
+  }
+
+  const current = readStore();
+  writeStore({
+    ...current,
+    ...state,
+    session: current.session,
+  });
+  res.json({ ok: true });
+});
+
 app.get('/api/users', (req, res) => {
   const db = readStore();
   res.json(db.users);

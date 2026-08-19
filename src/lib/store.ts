@@ -149,6 +149,7 @@ export interface AttendanceEntry {
 }
 
 const KEY = "hospiq_v1";
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "");
 
 function normalizeVitals(vitals?: Partial<Vitals>): Vitals {
   return {
@@ -256,7 +257,38 @@ function read(): DB {
 function write(db: DB) {
   localStorage.setItem(KEY, JSON.stringify(db));
   syncDbToSupabase(db);
+  if (API_URL && typeof window !== "undefined") {
+    void fetch(`${API_URL}/api/state`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(db),
+    }).catch((error) => console.error("HospiQ backend sync failed", error));
+  }
   window.dispatchEvent(new Event("hospiq:change"));
+}
+
+async function hydrateFromBackend() {
+  if (!API_URL || typeof window === "undefined") return;
+
+  try {
+    const response = await fetch(`${API_URL}/api/state`);
+    if (!response.ok) throw new Error(`Backend returned ${response.status}`);
+    const remote = await response.json() as Partial<DB>;
+    const local = read();
+    const merged: DB = {
+      ...local,
+      ...remote,
+      session: local.session,
+    };
+    localStorage.setItem(KEY, JSON.stringify(merged));
+    window.dispatchEvent(new Event("hospiq:change"));
+  } catch (error) {
+    console.error("HospiQ backend hydration failed", error);
+  }
+}
+
+if (typeof window !== "undefined") {
+  void hydrateFromBackend();
 }
 
 function syncDbToSupabase(db: DB) {
