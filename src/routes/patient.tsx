@@ -40,6 +40,10 @@ function PatientHome() {
   }, [ready, user, navigate]);
 
   useEffect(() => {
+    db.pruneExpiredWaitingTickets();
+  }, []);
+
+  useEffect(() => {
     if (!ticket) { setLastStatus(null); return; }
     if (ticket.status === lastStatus) return;
     setLastStatus(ticket.status);
@@ -54,6 +58,14 @@ function PatientHome() {
       toast(`⚠ Emergency case in ${DEPARTMENTS.find(d => d.code === emergencyNotice.departmentCode)?.name ?? "this department"}. Please wait and stay close.`);
     }
   }, [ticket, lastStatus, emergencyNotice]);
+
+  useEffect(() => {
+    if (!ticket || ticket.status !== "waiting") return;
+    const timer = window.setInterval(() => {
+      db.pruneExpiredWaitingTickets();
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [ticket]);
 
   if (!user || user.role !== "patient") return null;
 

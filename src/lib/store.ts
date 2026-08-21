@@ -266,19 +266,43 @@ function read(): DB {
     localStorage.setItem(KEY, JSON.stringify(s));
     return s;
   }
-  try { return JSON.parse(raw); } catch { return seed(); }
+  try {
+    const parsed = JSON.parse(raw) as DB;
+    const pruned = pruneExpiredWaitingTickets(parsed);
+    if (JSON.stringify(parsed) !== JSON.stringify(pruned)) {
+      localStorage.setItem(KEY, JSON.stringify(pruned));
+    }
+    return pruned;
+  } catch { return seed(); }
+}
+
+function pruneExpiredWaitingTickets(data: DB): DB {
+  const next = { ...data, queue: [...(data.queue ?? [])] };
+  next.queue = next.queue.filter((ticket) => {
+    if (ticket.status !== "waiting") return true;
+    const peopleAhead = next.queue.filter((item) => item.status === "waiting" && item.createdAt < ticket.createdAt).length;
+    const waitWindowMs = peopleAhead * 5 * 60 * 1000;
+    const graceWindowMs = 60 * 1000;
+    const expiresAt = ticket.createdAt + waitWindowMs + graceWindowMs;
+    if (Date.now() > expiresAt) {
+      return false;
+    }
+    return true;
+  });
+  return next;
 }
 
 function write(db: DB) {
-  db.medicines = db.medicines.filter((m) => m.stock > 0);
-  db.queue = db.queue.map((ticket) => {
+  const cleaned = pruneExpiredWaitingTickets(db);
+  cleaned.medicines = cleaned.medicines.filter((m) => m.stock > 0);
+  cleaned.queue = cleaned.queue.map((ticket) => {
     if (ticket.transfer && !ticket.transferDate) {
       ticket.transferDate = Date.now();
     }
     return ticket;
   });
-  localStorage.setItem(KEY, JSON.stringify(db));
-  syncDbToSupabase(db);
+  localStorage.setItem(KEY, JSON.stringify(cleaned));
+  syncDbToSupabase(cleaned);
   if (API_URL && typeof window !== "undefined") {
     void fetch(`${API_URL}/api/state`, {
       method: "PUT",
@@ -695,6 +719,15 @@ export const db = {
     const t = d.queue.find(x => x.id === ticketId);
     if (t) t.status = "removed";
     write(d);
+  },
+  pruneExpiredWaitingTickets() {
+    const d = read();
+    const before = d.queue.length;
+    const pruned = pruneExpiredWaitingTickets(d);
+    if (pruned.queue.length !== before) {
+      d.queue = pruned.queue;
+      write(d);
+    }
   },
   // Room management
   rooms: () => read().rooms,
