@@ -47,7 +47,7 @@ function Page() {
     doc.setFontSize(10); doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 25);
     autoTable(doc, {
       startY: 32,
-      head: [[tr("date_col"), tr("patient_col"), tr("diagnosis"), `${tr("medicines")} (RWF)`]],
+      head: [[tr("date_col"), tr("patient_col"), tr("diagnosis"), `${tr("medicines_col")} (RWF)`]],
       body: completed.map(t => [
         new Date(t.updatedAt ?? t.createdAt).toLocaleString(),
         t.patientName,

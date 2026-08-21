@@ -30,7 +30,7 @@ function Page() {
     doc.setFontSize(10); doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 25);
     autoTable(doc, {
       startY: 32,
-      head: [[tr("token_col"), tr("patient_col"), tr("department"), "Location", tr("insurance_col"), "Vitals"]],
+      head: [["#", tr("patient_col"), tr("department"), "Location", tr("insurance_col"), "Vitals"]],
       body: waiting.map(t => [
         `#${t.token}`,
         t.patientName,

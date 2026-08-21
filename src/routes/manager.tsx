@@ -325,7 +325,15 @@ function DoctorWorkTab() {
       const doctor = d.users.find((u: any) => u.id === ticket.assignedDoctorId && u.role === "doctor");
       if (!doctor) continue;
       const key = `${ticket.assignedDoctorId}:${new Date(ticket.createdAt).toISOString().slice(0, 10)}`;
-      const row = map.get(key) ?? { doctorId: ticket.assignedDoctorId, doctorName: `${doctor.firstName} ${doctor.lastName}`, date: new Date(ticket.createdAt).toISOString().slice(0, 10), total: 0, patients: [], departments: [], transfers: [] };
+      const row: { doctorId: string; doctorName: string; date: string; total: number; patients: string[]; departments: string[]; transfers: { patient: string; date: string }[] } = map.get(key) ?? {
+        doctorId: ticket.assignedDoctorId,
+        doctorName: `${doctor.firstName} ${doctor.lastName}`,
+        date: new Date(ticket.createdAt).toISOString().slice(0, 10),
+        total: 0,
+        patients: [],
+        departments: [],
+        transfers: [],
+      };
       row.total += 1;
       row.patients.push(ticket.patientName);
       row.departments.push(ticket.department);

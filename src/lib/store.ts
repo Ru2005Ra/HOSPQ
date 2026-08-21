@@ -308,7 +308,7 @@ function write(db: DB) {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(db),
-    }).catch((error) => console.error("HospiQ backend sync failed", error));
+    }).then(() => undefined).catch((error: unknown) => console.error("HospiQ backend sync failed", error));
   }
   window.dispatchEvent(new Event("hospiq:change"));
 }
@@ -364,7 +364,8 @@ function syncDbToSupabase(db: DB) {
       { onConflict: "id" },
     )
     .then(() => undefined)
-    .catch((error) => console.error("Supabase users sync failed", error));
+    .then(() => undefined)
+    .catch((error: unknown) => console.error("Supabase users sync failed", error));
 
   void client
     .from("medicines")
@@ -378,7 +379,7 @@ function syncDbToSupabase(db: DB) {
       { onConflict: "id" },
     )
     .then(() => undefined)
-    .catch((error) => console.error("Supabase medicines sync failed", error));
+    .catch((error: unknown) => console.error("Supabase medicines sync failed", error));
 
   void client
     .from("lab_tests")
@@ -392,7 +393,7 @@ function syncDbToSupabase(db: DB) {
       { onConflict: "id" },
     )
     .then(() => undefined)
-    .catch((error) => console.error("Supabase lab tests sync failed", error));
+    .catch((error: unknown) => console.error("Supabase lab tests sync failed", error));
 
   void client
     .from("rooms")
@@ -405,7 +406,7 @@ function syncDbToSupabase(db: DB) {
       { onConflict: "id" },
     )
     .then(() => undefined)
-    .catch((error) => console.error("Supabase rooms sync failed", error));
+    .catch((error: unknown) => console.error("Supabase rooms sync failed", error));
 
   void client
     .from("queue_tickets")
@@ -436,7 +437,7 @@ function syncDbToSupabase(db: DB) {
       { onConflict: "id" },
     )
     .then(() => undefined)
-    .catch((error) => console.error("Supabase queue sync failed", error));
+    .catch((error: unknown) => console.error("Supabase queue sync failed", error));
 
   void client
     .from("attendance")
@@ -453,7 +454,7 @@ function syncDbToSupabase(db: DB) {
       { onConflict: "id" },
     )
     .then(() => undefined)
-    .catch((error) => console.error("Supabase attendance sync failed", error));
+    .catch((error: unknown) => console.error("Supabase attendance sync failed", error));
 
   void client
     .from("reports")
@@ -468,7 +469,7 @@ function syncDbToSupabase(db: DB) {
       { onConflict: "id" },
     )
     .then(() => undefined)
-    .catch((error) => console.error("Supabase reports sync failed", error));
+    .catch((error: unknown) => console.error("Supabase reports sync failed", error));
 }
 
 export const db = {

@@ -538,7 +538,7 @@ function PharmacyPanel({ ticket }: { ticket: QueueTicket }) {
   const tr = useT();
   const { user } = useAuth();
   const transferItems = (ticket.prescription ?? []).filter(p => p.transfer);
-  const locationKey = [user?.province, user?.district, user?.sector].filter(Boolean).map(v => v?.toLowerCase());
+  const locationKey = [user?.province, user?.district, user?.sector].filter((v): v is string => Boolean(v)).map(v => v.toLowerCase());
   const nearby = NEARBY_PHARMACIES.filter(ph => locationKey.some(key => [ph.province, ph.district, ph.sector].map(v => v.toLowerCase()).includes(key)));
   const shownPharmacies = nearby.length > 0 ? nearby : NEARBY_PHARMACIES;
 

@@ -27,9 +27,6 @@ export default defineConfig({
         target: "ES2022",
       },
     },
-    server: {
-      sourcemap: false,
-    },
     build: {
       sourcemap: false,
     },
