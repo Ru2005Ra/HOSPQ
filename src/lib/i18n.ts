@@ -29,7 +29,7 @@ export const t = {
     // Nav
     home: "Home",
     about: "About",
-    login_register: "Login / Register",
+    login_register: "Login",
     logout: "Logout",
     dashboard: "dashboard",
     role_patient_label: "Patient",
@@ -391,7 +391,7 @@ export const t = {
     // Nav
     home: "Ahabanza",
     about: "Ibyerekeye",
-    login_register: "Injira / Iyandikishe",
+    login_register: "Injira",
     logout: "Sohoka",
     dashboard: "ikibaho",
     role_patient_label: "Umurwayi",
