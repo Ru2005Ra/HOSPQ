@@ -356,6 +356,16 @@ async function hydrateFromBackend() {
 
 if (typeof window !== "undefined") {
   void hydrateFromBackend();
+  if (API_URL) {
+    const refreshFromBackend = () => {
+      if (document.visibilityState === "hidden") return;
+      void hydrateFromBackend();
+    };
+
+    window.addEventListener("focus", refreshFromBackend);
+    document.addEventListener("visibilitychange", refreshFromBackend);
+    window.setInterval(refreshFromBackend, 10000);
+  }
 }
 
 function syncDbToSupabase(db: DB) {
