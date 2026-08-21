@@ -150,3 +150,119 @@
     color: var(--color-foreground);
   }
 }
+
+.patient-visual {
+  position: relative;
+  display: grid;
+  min-height: 230px;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.patient-dashboard-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  column-gap: 2.5rem;
+  align-items: start;
+}
+
+.patient-dashboard-content {
+  grid-column: 1;
+}
+
+.patient-visual {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: start;
+  margin-top: 2rem;
+}
+
+.patient-visual__glow {
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  border-radius: 999px;
+  background: oklch(1 0 0 / 0.48);
+  filter: blur(16px);
+  animation: patient-visual-glow 2.5s ease-in-out infinite;
+}
+
+.patient-visual__icon {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 132px;
+  height: 132px;
+  color: oklch(0.18 0.02 20);
+  border: 7px solid oklch(0.18 0.02 20);
+  border-radius: 999px;
+  background: oklch(1 0 0 / 0.62);
+  animation: patient-visual-bob 2.5s ease-in-out infinite;
+}
+
+.patient-visual__smile {
+  position: absolute;
+  bottom: 35px;
+  width: 16px;
+  height: 8px;
+  border-radius: 0 0 999px 999px;
+  background: oklch(0.75 0.16 185);
+  animation: patient-visual-smile 2.5s ease-in-out infinite;
+}
+
+.patient-visual__ring {
+  position: absolute;
+  z-index: -1;
+  width: 132px;
+  height: 132px;
+  border: 2px solid oklch(0.72 0.18 350 / 0.42);
+  border-radius: 999px;
+  animation: patient-visual-ring 2.5s ease-out infinite;
+}
+
+.patient-visual__ring--two {
+  animation-delay: 1.25s;
+}
+
+@keyframes patient-visual-bob {
+  0%, 100% { transform: translateY(3px) scale(0.98); }
+  50% { transform: translateY(-4px) scale(1); }
+}
+
+@keyframes patient-visual-smile {
+  0%, 35% { transform: scaleX(0.7); opacity: 0.55; }
+  55%, 100% { transform: scaleX(1.1); opacity: 1; }
+}
+
+@keyframes patient-visual-glow {
+  0%, 100% { transform: scale(0.82); opacity: 0.42; }
+  50% { transform: scale(1.12); opacity: 0.72; }
+}
+
+@keyframes patient-visual-ring {
+  0% { transform: scale(0.8); opacity: 0; }
+  25% { opacity: 0.7; }
+  100% { transform: scale(1.85); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .patient-visual__glow,
+  .patient-visual__icon,
+  .patient-visual__smile,
+  .patient-visual__ring {
+    animation: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .patient-dashboard-layout {
+    display: block;
+  }
+
+  .patient-visual {
+    min-height: 180px;
+    margin-top: 1.5rem;
+  }
+}

@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth, useDb, fmtDuration, fmtDurationWithSeconds } from "@/lib/hooks";
 import { calculatePatientPayable, db, DEPARTMENTS, hasCompleteVitals, type QueueTicket } from "@/lib/store";
 import { getProvinces, getDistricts, getSectors, getVillages } from "@/lib/locations";
-import { Clock3, Pill, Receipt, MapPin, CheckCheck, X, Loader2 } from "lucide-react";
+import { Clock3, Pill, Receipt, MapPin, CheckCheck, X, Loader2, CircleUserRound } from "lucide-react";
 import { useT } from "@/lib/i18n";
 
 export const Route = createFileRoute("/patient")({
@@ -33,6 +33,7 @@ function PatientHome() {
   const ticket = useDb((d) => (user ? d.queue?.find((t: any) => t.patientId === user.id && t.status !== "done" && t.status !== "removed") ?? null : null));
   const emergencyNotice = useDb((d) => d.emergencyAlert ?? null);
   const [lastStatus, setLastStatus] = useState<string | null>(null);
+  const [showPatientVisual, setShowPatientVisual] = useState(false);
   const vitalsPending = !!ticket && !hasCompleteVitals(ticket.vitals);
 
   useEffect(() => {
@@ -77,9 +78,24 @@ function PatientHome() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="mx-auto max-w-3xl px-4 py-10">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">{tr("hi")} {user.firstName} 👋</h1>
-        <p className="mt-2 text-muted-foreground">{tr("manage_visit")}</p>
+      <main className="mx-auto max-w-6xl px-4 py-10">
+        <div className="patient-dashboard-layout">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">{tr("hi")} {user.firstName} 👋</h1>
+            <p className="mt-2 text-muted-foreground">{tr("manage_visit")}</p>
+          </div>
+          {showPatientVisual && (
+            <div className="patient-visual" aria-hidden="true">
+              <div className="patient-visual__glow" />
+              <div className="patient-visual__icon">
+                <CircleUserRound className="h-24 w-24" strokeWidth={1.35} />
+                <span className="patient-visual__smile" />
+              </div>
+              <span className="patient-visual__ring patient-visual__ring--one" />
+              <span className="patient-visual__ring patient-visual__ring--two" />
+            </div>
+          )}
+          <div className="patient-dashboard-content">
         {vitalsPending && (
           <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm">
             {tr("vitals_required")}
@@ -95,14 +111,16 @@ function PatientHome() {
             {roomMessage}
           </div>
         )}
-        {!ticket && <StartVisit />}
-        {ticket && <ActiveVisit ticket={ticket} />}
+            {!ticket && <StartVisit onVisitStarted={() => setShowPatientVisual(true)} />}
+            {ticket && <ActiveVisit ticket={ticket} />}
+          </div>
+        </div>
       </main>
     </div>
   );
 }
 
-function StartVisit() {
+function StartVisit({ onVisitStarted }: { onVisitStarted: () => void }) {
   const { user } = useAuth();
   const tr = useT();
   const [step, setStep] = useState<"choice" | "location" | "dept">("choice");
@@ -131,6 +149,7 @@ function StartVisit() {
     const pos = db.all().queue.filter((x: any) => x.departmentCode === departmentCode && x.status === "waiting").length;
     const waitMin = pos * 5;
     toast.success(tr("token_wait", { token: t.token, minutes: waitMin }));
+    onVisitStarted();
   };
 
   if (step === "choice") return (
