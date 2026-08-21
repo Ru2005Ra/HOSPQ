@@ -164,10 +164,10 @@ function StaffTab() {
           <table className="w-full text-sm">
             <thead className="bg-secondary text-left text-muted-foreground">
               <tr>
-                <th className="p-3">Name</th>
-                <th className="p-3">Role</th>
-                <th className="p-3">Username</th>
-                <th className="p-3">Password</th>
+                <th className="p-3">{tr("name_col")}</th>
+                <th className="p-3">{tr("role")}</th>
+                <th className="p-3">{tr("username")}</th>
+                <th className="p-3">{tr("password")}</th>
                 <th className="p-3"></th>
               </tr>
             </thead>
@@ -178,7 +178,7 @@ function StaffTab() {
                   <td className="p-3 font-medium">{u.firstName} {u.lastName}</td>
                   <td className="p-3">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${ROLE_BADGE[u.role] ?? "bg-secondary text-foreground"}`}>
-                      {STAFF_ROLES.find(r => r.value === u.role)?.label ?? u.role}
+                      {u.role === "doctor" ? tr("role_doctor_label") : u.role === "reception" ? tr("role_reception_label") : u.role === "storekeeper" ? tr("role_pharmacy_label") : tr("role_laboratory_label")}
                     </span>
                   </td>
                   <td className="p-3 font-mono text-xs">{u.username}</td>
@@ -374,7 +374,7 @@ function DoctorWorkTab() {
                 <td className="p-3 text-xs text-muted-foreground">{Array.from(new Set(row.departments)).join(", ") || "—"}</td>
                 <td className="p-3 text-xs">
                   {row.transfers.length === 0 ? (
-                    <span className="rounded-full bg-green-100 px-2 py-1 text-green-700">No</span>
+                    <span className="rounded-full bg-green-100 px-2 py-1 text-green-700">{tr("no")}</span>
                   ) : (
                     <div className="space-y-1">
                       {row.transfers.map((item, idx) => (
