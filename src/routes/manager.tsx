@@ -340,7 +340,7 @@ function PatientsTab() {
                 <tr key={`emergency-${patient.id}`} className="border-t border-red-100">
                   <td className="p-3 font-medium">{patient.patientName}</td>
                   <td className="p-3 text-muted-foreground">{new Date(patient.emergencyAlert.startedAt ?? patient.createdAt).toLocaleDateString()}</td>
-                  <td className="p-3">{patient.department}</td>
+                  <td className="p-3">{DEPARTMENTS.find(department => department.code === patient.emergencyAlert.departmentCode)?.name ?? patient.department}</td>
                   <td className="p-3">{patient.emergencyAlert.active ? tr("emergency_active_status") : tr("emergency_resolved_status")}</td>
                   <td className="p-3 text-muted-foreground">{patient.emergencyAlert.description || patient.diagnosis || "—"}</td>
                 </tr>
