@@ -306,6 +306,8 @@ export const t = {
     emergency_placeholder: "Describe why this is an emergency...",
     send_emergency: "Send to Emergency",
     emergency_sent: "Patient triaged to emergency and doctor notified.",
+    emergency_active_reception: "Active emergency case",
+    mark_emergency_solved: "Mark emergency solved",
 
     // Doctor
     doctor_title: "Doctor",
@@ -647,6 +649,8 @@ export const t = {
     emergency_placeholder: "Sobanura impamvu iri ihutirwa...",
     send_emergency: "Ohereza ku Ihutirwa",
     emergency_sent: "Umurwayi yoherejwe ku ihutirwa kandi umuganga yamenyeshejwe.",
+    emergency_active_reception: "Ihutirwa ririmo gukorwa",
+    mark_emergency_solved: "Emeza ko ihutirwa ryakemutse",
 
     // Doctor
     doctor_title: "Umuganga",

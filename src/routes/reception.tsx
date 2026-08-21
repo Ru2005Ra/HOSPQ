@@ -19,6 +19,7 @@ export const Route = createFileRoute("/reception")({
 function Page() {
   const tr = useT();
   const queue = useDb((d) => d.queue ?? []);
+  const emergencyAlert = useDb((d) => d.emergencyAlert ?? null);
   const waiting = queue.filter((t: any) => t.status === "waiting");
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -86,6 +87,27 @@ function Page() {
           <Stat label={tr("avg_wait")} value={`${waiting.length * 5} min`} />
           <Stat label={tr("today_total")} value={today.length} />
         </div>
+
+        {emergencyAlert?.active && (
+          <div className="mt-6 flex flex-col gap-4 rounded-xl border border-red-200 bg-red-50 p-5 text-red-900 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold">{tr("emergency_active_reception")}</p>
+              <p className="mt-1 text-sm">
+                {DEPARTMENTS.find(department => department.code === emergencyAlert.departmentCode)?.name ?? emergencyAlert.departmentCode}: {emergencyAlert.description}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => {
+                db.clearEmergency(emergencyAlert.departmentCode);
+                toast.success(tr("emergency_solved"));
+              }}
+              className="bg-green-600 text-white hover:bg-green-700"
+            >
+              {tr("mark_emergency_solved")}
+            </Button>
+          </div>
+        )}
 
         <h2 className="mt-10 text-lg font-semibold text-foreground">{tr("waiting_list")}</h2>
         <div className="mt-3 overflow-x-auto rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
