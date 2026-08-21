@@ -87,6 +87,7 @@ export interface QueueTicket {
   departmentCode: string;
   createdAt: number;
   status: "waiting" | "with-doctor" | "paying" | "pharmacy" | "done" | "removed";
+  receptionApproved?: boolean;
 
   // Assigned doctor for the consultation.
   assignedDoctorId?: string;
@@ -616,6 +617,7 @@ export const db = {
       departmentCode: dept.code,
       createdAt: Date.now(),
       status: "waiting",
+      receptionApproved: false,
     };
     d.queue.push(ticket);
     if (patient.insurance !== insurance) {
@@ -663,7 +665,7 @@ export const db = {
     if (!doctor) return null;
 
     const next = d.queue
-      .filter(t => t.status === "waiting" && t.departmentCode !== "LB" && hasCompleteVitals(t.vitals) && (doctor.departmentCodes ?? []).includes(t.departmentCode))
+      .filter(t => t.status === "waiting" && t.receptionApproved === true && t.departmentCode !== "LB" && hasCompleteVitals(t.vitals) && (doctor.departmentCodes ?? []).includes(t.departmentCode))
       .sort((a, b) => a.createdAt - b.createdAt)[0];
 
     if (!next) return null;
@@ -675,6 +677,15 @@ export const db = {
 
     write(d);
     return next;
+  },
+
+  approveReceptionAccess(ticketId: string): boolean {
+    const d = read();
+    const ticket = d.queue.find(item => item.id === ticketId);
+    if (!ticket || ticket.status !== "waiting" || !hasCompleteVitals(ticket.vitals)) return false;
+    ticket.receptionApproved = true;
+    write(d);
+    return true;
   },
 
   currentWithDoctor(doctorId?: string): QueueTicket | null {

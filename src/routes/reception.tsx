@@ -20,7 +20,9 @@ function Page() {
   const tr = useT();
   const queue = useDb((d) => d.queue ?? []);
   const waiting = queue.filter((t: any) => t.status === "waiting");
-  const today = queue.filter((t: any) => t.createdAt > Date.now() - 24 * 3600 * 1000);
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const today = queue.filter((t: any) => t.createdAt >= todayStart.getTime());
   const [modal, setModal] = useState<{ patientId: string; ticketId: string } | null>(null);
   const [emergency, setEmergency] = useState<{ ticketId: string; description: string } | null>(null);
 
@@ -110,6 +112,17 @@ function Page() {
                   <td className="p-3 text-muted-foreground text-xs">{insuranceFor(t.patientId)}</td>
                   <td className="p-3 text-muted-foreground text-xs">{vitalsFor(t.id)}</td>
                   <td className="p-3 text-right space-x-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!t.vitals?.weight || !t.vitals?.temperature || !t.vitals?.bloodPressure || t.receptionApproved === true}
+                      onClick={() => {
+                        if (db.approveReceptionAccess(t.id)) toast.success(tr("doctor_access_granted"));
+                        else toast.error(tr("complete_vitals_first"));
+                      }}
+                    >
+                      {t.receptionApproved ? tr("access_granted") : tr("allow_doctor_access")}
+                    </Button>
                     <Button size="sm" variant="outline" onClick={() => setModal({ patientId: t.patientId, ticketId: t.id })}>{tr("edit_info")}</Button>
                     <Button size="sm" variant="outline" onClick={() => setEmergency({ ticketId: t.id, description: "" })}>{tr("triage")}</Button>
                     <Button size="sm" variant="outline" onClick={() => { db.removeTicket(t.id); toast.success(tr("token_removed")); }}>{tr("remove")}</Button>
@@ -119,6 +132,41 @@ function Page() {
             </tbody>
           </table>
         </div>
+
+        <section className="mt-10">
+          <h2 className="text-lg font-semibold text-foreground">{tr("today_patient_services")}</h2>
+          <div className="mt-3 overflow-x-auto rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
+            <table className="w-full text-sm">
+              <thead className="bg-secondary text-left text-muted-foreground">
+                <tr>
+                  <th className="p-3">{tr("patient_col")}</th>
+                  <th className="p-3">{tr("service_date")}</th>
+                  <th className="p-3">{tr("service_time")}</th>
+                  <th className="p-3">{tr("weight")}</th>
+                  <th className="p-3">{tr("temp")}</th>
+                  <th className="p-3">{tr("bp")}</th>
+                  <th className="p-3">{tr("department")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {today.length === 0 && (
+                  <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">{tr("no_services_today")}</td></tr>
+                )}
+                {[...today].sort((a: any, b: any) => b.createdAt - a.createdAt).map((ticket: any) => (
+                  <tr key={`service-${ticket.id}`} className="border-t border-border">
+                    <td className="p-3 font-medium">{ticket.patientName}</td>
+                    <td className="p-3 text-muted-foreground">{new Date(ticket.createdAt).toLocaleDateString()}</td>
+                    <td className="p-3 text-muted-foreground">{new Date(ticket.createdAt).toLocaleTimeString()}</td>
+                    <td className="p-3">{ticket.vitals?.weight || "—"} kg</td>
+                    <td className="p-3">{ticket.vitals?.temperature || "—"} °C</td>
+                    <td className="p-3">{ticket.vitals?.bloodPressure || "—"}</td>
+                    <td className="p-3">{ticket.department || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
         {modal && <EditModal {...modal} onClose={() => setModal(null)} />}
         {emergency && <EmergencyModal {...emergency} onClose={() => setEmergency(null)} />}
