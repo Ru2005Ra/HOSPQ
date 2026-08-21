@@ -83,6 +83,8 @@ export interface QueueTicket {
   insurance?: string;
   vitals: Vitals;
   token: string;
+  stageToken?: string;
+  stageStartedAt?: number;
   department: string;
   departmentCode: string;
   createdAt: number;
@@ -97,6 +99,7 @@ export interface QueueTicket {
 
   diagnosis?: string;
   prescription?: { medicineId?: string; name: string; qty: number; price: number; transfer?: boolean }[];
+  stockDeducted?: boolean;
   doctorNote?: string;
   paid?: boolean;
   paidAmount?: number;
@@ -299,9 +302,18 @@ function pruneExpiredWaitingTickets(data: DB): DB {
   return next;
 }
 
+function nextStageToken(data: DB, departmentCode: string) {
+  const used = data.queue
+    .map(ticket => ticket.stageToken)
+    .filter((token): token is string => !!token && token.startsWith(departmentCode))
+    .map(token => Number(token.slice(departmentCode.length)))
+    .filter(Number.isFinite);
+  const next = (used.length ? Math.max(...used) : 0) + 1;
+  return `${departmentCode}${String(next).padStart(3, "0")}`;
+}
+
 function write(db: DB) {
   const cleaned = pruneExpiredWaitingTickets(db);
-  cleaned.medicines = cleaned.medicines.filter((m) => m.stock > 0);
   cleaned.queue = cleaned.queue.map((ticket) => {
     if (ticket.transfer && !ticket.transferDate) {
       ticket.transferDate = Date.now();
@@ -716,10 +728,18 @@ export const db = {
     const d = read();
     const t = d.queue.find(x => x.id === ticketId);
     if (!t) return;
-    const hasTransfer = (payload.prescription ?? []).some(item => item.transfer === true);
+    const prescription = (payload.prescription ?? []).map(item => {
+      if (item.transfer || !item.medicineId) return item;
+      const medicine = d.medicines.find(stockItem => stockItem.id === item.medicineId);
+      if (!medicine || medicine.stock < item.qty) return { ...item, transfer: true };
+      medicine.stock -= item.qty;
+      return item;
+    });
+    const hasTransfer = prescription.some(item => item.transfer === true);
     t.diagnosis = payload.diagnosis;
-    t.prescription = payload.prescription;
+    t.prescription = prescription;
     t.doctorNote = payload.doctorNote;
+    t.stockDeducted = true;
     t.transfer = hasTransfer;
     t.transferDate = hasTransfer ? (t.transferDate ?? Date.now()) : null;
     t.status = "paying";
@@ -749,6 +769,8 @@ export const db = {
       .filter(Boolean) as RequestedLabTest[];
 
     t.labRequestedTests = requested;
+    t.stageToken = nextStageToken(d, "LB");
+    t.stageStartedAt = Date.now();
     t.returnDepartmentCode = t.returnDepartmentCode ?? t.departmentCode;
     t.departmentCode = "LB";
     t.department = "Laboratory";
@@ -935,6 +957,8 @@ export const db = {
     t.paymentConfirmed = paymentMethod === "mobile";
     t.paymentConfirmedBy = paymentMethod === "mobile" ? "Cashier" : null;
     t.paymentConfirmedAt = paymentMethod === "mobile" ? Date.now() : null;
+    t.stageToken = nextStageToken(d, "PH");
+    t.stageStartedAt = Date.now();
     t.status = "pharmacy";
     d.reports.push({
       id: uid(),
@@ -954,6 +978,8 @@ export const db = {
     t.paymentConfirmed = true;
     t.paymentConfirmedBy = `${staff.firstName} ${staff.lastName}`;
     t.paymentConfirmedAt = Date.now();
+    t.stageToken = t.stageToken?.startsWith("PH") ? t.stageToken : nextStageToken(d, "PH");
+    t.stageStartedAt = t.stageStartedAt ?? Date.now();
     t.status = "pharmacy";
     write(d);
   },
@@ -973,12 +999,6 @@ export const db = {
     const d = read();
     const t = d.queue.find(x => x.id === ticketId);
     if (!t) return;
-    for (const p of t.prescription ?? []) {
-      if (p.transfer) continue;
-      const m = d.medicines.find(m => m.id === p.medicineId);
-      if (m) m.stock = Math.max(0, m.stock - p.qty);
-    }
-    d.medicines = d.medicines.filter((m) => m.stock > 0);
     t.dispensedAt = Date.now();
     t.status = "done";
     write(d);

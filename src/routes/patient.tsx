@@ -39,6 +39,7 @@ function PatientHome() {
   const [guidanceSeenStatus, setGuidanceSeenStatus] = useState<string | null>(null);
   const warningKey = useRef<string | null>(null);
   const vitalsPending = !!ticket && !hasCompleteVitals(ticket.vitals);
+  const stageKey = ticket ? `${ticket.status}:${ticket.departmentCode}:${ticket.stageToken ?? ticket.token}` : null;
 
   useEffect(() => {
     if (!ticket || ticket.status !== "waiting") return;
@@ -77,12 +78,12 @@ function PatientHome() {
   }, []);
 
   useEffect(() => {
-    if (!ticket) { setLastStatus(null); return; }
-    if (ticket.status === lastStatus) return;
-    setLastStatus(ticket.status);
+    if (!ticket || !stageKey) { setLastStatus(null); return; }
+    if (stageKey === lastStatus) return;
+    setLastStatus(stageKey);
     const room = DEPARTMENTS.find(d => d.code === ticket.departmentCode)?.room ?? "consultation room";
     const doctorName = ticket.assignedDoctorName ? `Dr. ${ticket.assignedDoctorName}` : "the selected doctor";
-    if (ticket.status === "waiting") toast(`✅ ${tr("token_ready", { token: ticket.token })}`);
+    if (ticket.status === "waiting") toast(`✅ ${tr("token_ready", { token: ticket.stageToken ?? ticket.token })}`);
     if (ticket.status === "with-doctor") toast(`🩺 ${tr("doctor_ready", { doctor: doctorName, room })}`);
     if (ticket.status === "paying") toast(`💳 ${tr("consultation_done")}`);
     if (ticket.status === "pharmacy") toast(`💊 ${tr("collect_medicines")}`);
@@ -90,7 +91,7 @@ function PatientHome() {
     if (emergencyNotice && emergencyNotice.departmentCode === ticket.departmentCode && emergencyNotice.active) {
       toast(`⚠ ${tr("emergency_case_wait")}`);
     }
-  }, [ticket, lastStatus, emergencyNotice]);
+  }, [ticket, stageKey, lastStatus, emergencyNotice]);
 
   useEffect(() => {
     if (!ticket || !["waiting", "with-doctor"].includes(ticket.status)) return;
@@ -121,10 +122,10 @@ function PatientHome() {
               ticket={ticket}
               emergency={emergencyNotice && emergencyNotice.departmentCode === ticket?.departmentCode ? emergencyNotice : null}
               open={guidanceOpen}
-              isNew={guidanceSeenStatus !== `${ticket?.status}:${emergencyNotice?.active ?? "none"}`}
+              isNew={guidanceSeenStatus !== `${stageKey}:${emergencyNotice?.active ?? "none"}`}
               onToggle={() => {
                 setGuidanceOpen(value => !value);
-                setGuidanceSeenStatus(`${ticket?.status}:${emergencyNotice?.active ?? "none"}`);
+                setGuidanceSeenStatus(`${stageKey}:${emergencyNotice?.active ?? "none"}`);
               }}
             />
           )}
@@ -166,7 +167,8 @@ function PatientGuidance({
   isNew: boolean;
   onToggle: () => void;
 }) {
-  const guidance = getPatientGuidance(ticket);
+  const tr = useT();
+  const guidance = getPatientGuidance(ticket, tr);
   if (!ticket) return null;
 
   return (
@@ -177,7 +179,7 @@ function PatientGuidance({
         className="patient-visual__button"
         onClick={onToggle}
         aria-expanded={open}
-        aria-label="Open visit guidance"
+        aria-label={tr("open_visit_guidance")}
       >
         <CircleUserRound className="h-24 w-24" strokeWidth={1.35} />
         <span className="patient-visual__smile" />
@@ -188,12 +190,12 @@ function PatientGuidance({
       {open && (
         <div className="patient-guidance-panel" role="status">
           <div className="patient-guidance-panel__heading">
-            <span className="patient-guidance-panel__eyebrow"><Sparkles className="h-3.5 w-3.5" /> Visit guide</span>
+            <span className="patient-guidance-panel__eyebrow"><Sparkles className="h-3.5 w-3.5" /> {tr("visit_guide")}</span>
             <button type="button" onClick={onToggle} className="patient-guidance-panel__close" aria-label="Close visit guidance"><X className="h-4 w-4" /></button>
           </div>
-          <h2>{emergency?.active ? "Emergency case in your department" : guidance.title}</h2>
+          <h2>{emergency?.active ? tr("emergency_department_title") : guidance.title}</h2>
           {emergency?.active && <p className="patient-guidance-panel__emergency">{emergency.description}</p>}
-          {!emergency?.active && emergency && <p className="patient-guidance-panel__solved">Emergency case solved. Normal visit flow has resumed.</p>}
+          {!emergency?.active && emergency && <p className="patient-guidance-panel__solved">{tr("emergency_solved")}</p>}
           <p>{guidance.message}</p>
           <div className="patient-guidance-panel__location"><Navigation className="h-4 w-4" /><span>{guidance.location}</span></div>
           {guidance.details.length > 0 && <ul>{guidance.details.map(detail => <li key={detail}>{detail}</li>)}</ul>}
@@ -205,44 +207,50 @@ function PatientGuidance({
   );
 }
 
-function getPatientGuidance(ticket: QueueTicket | null) {
-  if (!ticket) return { title: "Visit guidance", message: "Your visit information will appear here.", location: "Hospital", details: [], amount: "", next: "" };
+function getPatientGuidance(ticket: QueueTicket | null, tr: ReturnType<typeof useT>) {
+  if (!ticket) return { title: tr("visit_guidance_default_title"), message: tr("visit_guidance_default_message"), location: tr("hospital"), details: [], amount: "", next: "" };
   const room = DEPARTMENTS.find(department => department.code === ticket.departmentCode)?.room ?? "the assigned hospital room";
   const doctor = ticket.assignedDoctorName ? `Dr. ${ticket.assignedDoctorName}` : "your assigned doctor";
   const tests = ticket.labRequestedTests?.map(test => test.name) ?? [];
 
   if (ticket.status === "waiting" && ticket.departmentCode === "LB") {
     return {
-      title: "Laboratory tests required",
-      message: "Your doctor requested these tests before your visit can continue.",
-      location: "Lab section",
-      details: [...tests.map(test => `Test: ${test}`), ticket.diagnosis ? `Doctor's concern: ${ticket.diagnosis}` : "Follow the laboratory team's instructions."],
+      title: tr("laboratory_tests_required"),
+      message: tr("laboratory_tests_message"),
+      location: tr("lab_section"),
+      details: [...tests.map(test => tr("test_label", { test })), ticket.diagnosis ? tr("doctors_concern", { diagnosis: ticket.diagnosis }) : tr("lab_team_instructions")],
       amount: "",
-      next: "After testing, return to your consultation area.",
+      next: tr("after_testing_return"),
     };
   }
   if (ticket.status === "waiting" && ticket.assignedDoctorName) {
-    return { title: "Your doctor is ready soon", message: `Please stay near the consultation area for ${doctor}.`, location: room, details: ["Reception will call your token when it is your turn."], amount: "", next: "Next: doctor consultation" };
+    return { title: tr("doctor_ready_soon_title"), message: tr("doctor_ready_soon_message", { doctor }), location: room, details: [tr("reception_call_token")], amount: "", next: tr("next_doctor_consultation") };
   }
   if (ticket.status === "with-doctor") {
-    return { title: "You are with the doctor", message: `${doctor} is reviewing your visit now.`, location: room, details: ["The doctor may send you to the laboratory if testing is needed.", "Your next step will appear here after the consultation."], amount: "", next: "Next: laboratory or payment" };
+    return { title: tr("with_doctor_guidance_title"), message: tr("with_doctor_guidance_message", { doctor }), location: room, details: [tr("doctor_may_request_lab"), tr("next_step_appear")], amount: "", next: tr("next_lab_or_payment") };
   }
   if (ticket.status === "paying") {
     const total = (ticket.prescription ?? []).reduce((sum, item) => sum + (item.transfer ? 0 : item.price * item.qty), 0);
     const payable = calculatePatientPayable(total, ticket.insurance);
-    return { title: "Payment required", message: "Please complete payment before collecting your medicines.", location: "Payment desk", details: ["You can pay by mobile money or cash.", `Insurance: ${ticket.insurance ?? "Cash"}`], amount: `Amount to pay: ${payable.toLocaleString()} RWF`, next: "Next: pharmacy" };
+    return { title: tr("payment_required_title"), message: tr("payment_required_message"), location: tr("payment_desk"), details: [tr("payment_methods"), tr("insurance_label", { insurance: ticket.insurance ?? tr("cash") })], amount: tr("amount_to_pay", { amount: payable.toLocaleString() }), next: tr("next_pharmacy") };
   }
   if (ticket.status === "pharmacy") {
-    return { title: "Collect your medicines", message: "Your payment is confirmed. Please go to the pharmacy counter.", location: "Pharmacy counter, near the main exit", details: ["Show your token to the pharmacy team."], amount: "", next: "Next: medicine collection" };
+    return { title: tr("collect_medicines_title"), message: tr("collect_medicines_message"), location: tr("pharmacy_location"), details: [tr("show_token_pharmacy")], amount: "", next: tr("next_medicine_collection") };
   }
-  return { title: "Reception is processing your visit", message: "Please wait for your token to be called and keep your phone nearby.", location: room, details: ["Reception will record your vitals before you continue."], amount: "", next: "Next: doctor consultation" };
+  return { title: tr("reception_processing_title"), message: tr("reception_processing_message"), location: room, details: [tr("reception_record_vitals")], amount: "", next: tr("next_doctor_consultation") };
 }
 
 function StartVisit({ onVisitStarted }: { onVisitStarted: () => void }) {
   const { user } = useAuth();
   const tr = useT();
   const [step, setStep] = useState<"choice" | "location" | "dept">("choice");
-  const [location, setLocation] = useState({ province: "", district: "", sector: "", cell: "" });
+  const savedLocation = !!(user?.province && user?.district && user?.sector);
+  const [location, setLocation] = useState({
+    province: user?.province ?? "",
+    district: user?.district ?? "",
+    sector: user?.sector ?? "",
+    cell: user?.village ?? "",
+  });
 
   const availableDepts = DEPARTMENTS.filter(d => {
     if (d.code === "MH") return false;
@@ -276,7 +284,7 @@ function StartVisit({ onVisitStarted }: { onVisitStarted: () => void }) {
         <h3 className="text-lg font-semibold text-foreground">{tr("new_patient_btn")}</h3>
         <p className="mt-2 text-sm text-muted-foreground">{tr("new_patient_desc")}</p>
       </button>
-      <button onClick={() => setStep("location")} className="rounded-xl border border-border bg-card p-6 text-left shadow-[var(--shadow-card)] transition hover:bg-secondary">
+      <button onClick={() => setStep(savedLocation ? "dept" : "location")} className="rounded-xl border border-border bg-card p-6 text-left shadow-[var(--shadow-card)] transition hover:bg-secondary">
         <h3 className="text-lg font-semibold text-foreground">{tr("returning")}</h3>
         <p className="mt-2 text-sm text-muted-foreground">{tr("returning_desc")}</p>
       </button>
@@ -418,9 +426,16 @@ function TokenCard({ ticket }: { ticket: QueueTicket }) {
   const ahead = useDb((d) => {
     const t = d.queue?.find((x: any) => x.id === ticket?.id);
     if (!t) return 0;
-    return d.queue?.filter((x: any) => x.status === "waiting" && x.createdAt < t.createdAt).length ?? 0;
+    const stageCode = t.status === "pharmacy" ? "PH" : t.departmentCode;
+    const stageTime = t.stageStartedAt ?? t.createdAt;
+    return d.queue?.filter((x: any) => {
+      const sameStage = x.id !== t.id && (x.status === "pharmacy" ? "PH" : x.departmentCode) === stageCode;
+      const active = stageCode === "PH" ? x.status === "pharmacy" : x.status === "waiting";
+      return sameStage && active && (x.stageStartedAt ?? x.createdAt) < stageTime;
+    }).length ?? 0;
   });
   const emergencyNotice = useDb((d) => d.emergencyAlert ?? null);
+  const stageTime = ticket.stageStartedAt ?? ticket.createdAt;
   const waitMs = ahead * 5 * 60 * 1000;
   const [now, setNow] = useState(Date.now());
   const emergencyPause = !!(emergencyNotice && emergencyNotice.departmentCode === ticket.departmentCode && emergencyNotice.active);
@@ -429,17 +444,19 @@ function TokenCard({ ticket }: { ticket: QueueTicket }) {
     const i = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(i);
   }, [emergencyPause]);
-  const deadline = useMemo(() => ticket.createdAt + waitMs, [ticket.createdAt, waitMs]);
+  const deadline = useMemo(() => stageTime + waitMs, [stageTime, waitMs]);
   const remaining = Math.max(0, deadline - now);
   const green = remaining >= 5 * 60 * 1000;
   const estimatedWaitMin = ahead * 5;
+  const stageQueue = ticket.status === "pharmacy" || (ticket.status === "waiting" && ticket.departmentCode === "LB");
+  const currentToken = ticket.stageToken ?? ticket.token;
 
   return (
     <div className="rounded-2xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">
       <p className="text-sm uppercase tracking-wide text-muted-foreground">{tr("your_token")}</p>
-      <p className="mt-2 text-7xl font-bold text-primary">#{ticket.token}</p>
+      <p className="mt-2 text-5xl font-bold tracking-tight text-primary sm:text-6xl">#{currentToken}</p>
       <p className="mt-3 text-sm text-muted-foreground">{tr("dept")} {ticket.department}</p>
-      {ticket.status === "waiting" && (
+      {(ticket.status === "waiting" || stageQueue) && (
         <>
           <p className="mt-2 text-sm text-muted-foreground">
             {ahead} {ahead === 1 ? tr("person_ahead") : tr("people_ahead")}
@@ -466,15 +483,20 @@ function TokenCard({ ticket }: { ticket: QueueTicket }) {
 
 function VisitStagesTable({ ticket }: { ticket: QueueTicket }) {
   const tr = useT();
+  const receptionDone = ticket.receptionApproved === true || ["with-doctor", "paying", "pharmacy", "done"].includes(ticket.status);
+  const doctorDone = ticket.departmentCode === "LB" || ["paying", "pharmacy", "done"].includes(ticket.status);
+  const laboratoryDone = ticket.labRequestedTests?.length
+    ? ticket.labRequestedTests.every(test => test.status === "done")
+    : ["paying", "pharmacy", "done"].includes(ticket.status);
+  const laboratoryActive = ticket.status === "waiting" && ticket.departmentCode === "LB";
   const stages = [
-    // Reception is considered done once the patient leaves the waiting queue.
-    { name: tr("reception_stage"), desc: tr("reception_stage_desc"), done: ticket.status !== "waiting", active: ticket.status === "waiting" },
+    { name: tr("reception_stage"), desc: tr("reception_stage_desc"), done: receptionDone, active: !receptionDone },
     // Doctor is active during consultation.
-    { name: tr("doctor_stage"), desc: tr("doctor_stage_desc"), done: ["paying", "pharmacy", "done"].includes(ticket.status), active: ticket.status === "with-doctor" },
+    { name: tr("doctor_stage"), desc: tr("doctor_stage_desc"), done: doctorDone, active: ticket.status === "with-doctor" && !doctorDone },
     // Laboratory isn't a real status in the queue right now, so we mark it as:
     // - pending while waiting/with-doctor
     // - done once the workflow reaches payment or beyond.
-    { name: tr("laboratory_stage"), desc: tr("laboratory_stage_desc"), done: ["paying", "pharmacy", "done"].includes(ticket.status), active: false },
+    { name: tr("laboratory_stage"), desc: tr("laboratory_stage_desc"), done: laboratoryDone, active: laboratoryActive },
     { name: tr("payment_stage"), desc: tr("payment_stage_desc"), done: ["pharmacy", "done"].includes(ticket.status), active: ticket.status === "paying" },
     { name: tr("pharmacy_stage"), desc: tr("pharmacy_stage_desc"), done: ticket.status === "done", active: ticket.status === "pharmacy" },
   ];

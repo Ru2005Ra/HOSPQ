@@ -63,7 +63,7 @@ function DispenseTab() {
             )}
             {queue.map(t => (
               <tr key={t.id} className="border-t border-border">
-                <td className="p-3 font-semibold text-primary">#{t.token}</td>
+                <td className="p-3 font-semibold text-primary">#{t.stageToken ?? t.token}</td>
                 <td className="p-3">{t.patientName}</td>
                 <td className="p-3 text-xs text-muted-foreground">
                   {(t.prescription ?? []).map((p: any) => `${p.name}×${p.qty}`).join(", ") || "—"}

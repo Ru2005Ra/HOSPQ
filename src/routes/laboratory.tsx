@@ -77,7 +77,7 @@ function LabPage() {
               {queue.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">{tr("no_lab")}</td></tr>}
               {queue.map(t => (
                 <tr key={t.id} className="border-t border-border">
-                  <td className="p-3 font-semibold text-primary">#{t.token}</td>
+                  <td className="p-3 font-semibold text-primary">#{t.stageToken ?? t.token}</td>
                   <td className="p-3">{t.patientName}</td>
                   <td className="p-3 text-xs">
                     {(t.labRequestedTests ?? []).map((test: any, i: number) => (
