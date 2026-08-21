@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Header } from "@/components/Header";
@@ -32,11 +32,41 @@ function PatientHome() {
   const tr = useT();
   const ticket = useDb((d) => (user ? d.queue?.find((t: any) => t.patientId === user.id && t.status !== "done" && t.status !== "removed") ?? null : null));
   const emergencyNotice = useDb((d) => d.emergencyAlert ?? null);
+  const peopleAhead = useDb((d) => ticket ? d.queue?.filter((item: any) => item.status === "waiting" && item.createdAt < ticket.createdAt).length ?? 0 : 0);
   const [lastStatus, setLastStatus] = useState<string | null>(null);
   const [showPatientVisual, setShowPatientVisual] = useState(false);
   const [guidanceOpen, setGuidanceOpen] = useState(false);
   const [guidanceSeenStatus, setGuidanceSeenStatus] = useState<string | null>(null);
+  const warningKey = useRef<string | null>(null);
   const vitalsPending = !!ticket && !hasCompleteVitals(ticket.vitals);
+
+  useEffect(() => {
+    if (!ticket || ticket.status !== "waiting") return;
+    const checkWaitWarning = () => {
+      const remaining = ticket.createdAt + peopleAhead * 5 * 60 * 1000 - Date.now();
+      const key = `${ticket.id}:${ticket.createdAt}`;
+      if (remaining > 0 && remaining <= 3 * 60 * 1000 && warningKey.current !== key) {
+        warningKey.current = key;
+        toast("🔔 Your turn is coming soon. Please prepare to meet the doctor.");
+        if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate([250, 120, 250]);
+        if (typeof window !== "undefined" && "AudioContext" in window) {
+          const audio = new AudioContext();
+          const oscillator = audio.createOscillator();
+          const gain = audio.createGain();
+          oscillator.frequency.value = 880;
+          gain.gain.setValueAtTime(0.08, audio.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.35);
+          oscillator.connect(gain).connect(audio.destination);
+          oscillator.start();
+          oscillator.stop(audio.currentTime + 0.35);
+          void audio.close();
+        }
+      }
+    };
+    checkWaitWarning();
+    const timer = window.setInterval(checkWaitWarning, 1000);
+    return () => window.clearInterval(timer);
+  }, [ticket, peopleAhead]);
 
   useEffect(() => {
     if (ready && (!user || user.role !== "patient")) navigate({ to: "/auth" });
@@ -63,7 +93,7 @@ function PatientHome() {
   }, [ticket, lastStatus, emergencyNotice]);
 
   useEffect(() => {
-    if (!ticket || ticket.status !== "waiting") return;
+    if (!ticket || !["waiting", "with-doctor"].includes(ticket.status)) return;
     const timer = window.setInterval(() => {
       db.pruneExpiredWaitingTickets();
     }, 1000);
@@ -89,11 +119,12 @@ function PatientHome() {
           {showPatientVisual && (
             <PatientGuidance
               ticket={ticket}
+              emergency={emergencyNotice && emergencyNotice.departmentCode === ticket?.departmentCode ? emergencyNotice : null}
               open={guidanceOpen}
-              isNew={guidanceSeenStatus !== ticket?.status}
+              isNew={guidanceSeenStatus !== `${ticket?.status}:${emergencyNotice?.active ?? "none"}`}
               onToggle={() => {
                 setGuidanceOpen(value => !value);
-                setGuidanceSeenStatus(ticket?.status ?? null);
+                setGuidanceSeenStatus(`${ticket?.status}:${emergencyNotice?.active ?? "none"}`);
               }}
             />
           )}
@@ -124,11 +155,13 @@ function PatientHome() {
 
 function PatientGuidance({
   ticket,
+  emergency,
   open,
   isNew,
   onToggle,
 }: {
   ticket: QueueTicket | null;
+  emergency: { departmentCode: string; description: string; active: boolean; startedAt: number } | null;
   open: boolean;
   isNew: boolean;
   onToggle: () => void;
@@ -137,7 +170,7 @@ function PatientGuidance({
   if (!ticket) return null;
 
   return (
-    <div className={`patient-visual ${isNew ? "patient-visual--new" : ""}`}>
+    <div className={`patient-visual ${isNew ? "patient-visual--new" : ""} ${emergency?.active ? "patient-visual--emergency" : ""}`}>
       <div className="patient-visual__glow" />
       <button
         type="button"
@@ -158,7 +191,9 @@ function PatientGuidance({
             <span className="patient-guidance-panel__eyebrow"><Sparkles className="h-3.5 w-3.5" /> Visit guide</span>
             <button type="button" onClick={onToggle} className="patient-guidance-panel__close" aria-label="Close visit guidance"><X className="h-4 w-4" /></button>
           </div>
-          <h2>{guidance.title}</h2>
+          <h2>{emergency?.active ? "Emergency case in your department" : guidance.title}</h2>
+          {emergency?.active && <p className="patient-guidance-panel__emergency">{emergency.description}</p>}
+          {!emergency?.active && emergency && <p className="patient-guidance-panel__solved">Emergency case solved. Normal visit flow has resumed.</p>}
           <p>{guidance.message}</p>
           <div className="patient-guidance-panel__location"><Navigation className="h-4 w-4" /><span>{guidance.location}</span></div>
           {guidance.details.length > 0 && <ul>{guidance.details.map(detail => <li key={detail}>{detail}</li>)}</ul>}

@@ -215,6 +215,18 @@
   box-shadow: 0 0 0 7px oklch(0.65 0.2 145 / 0.16), 0 10px 28px oklch(0.65 0.2 145 / 0.2);
 }
 
+.patient-visual--emergency .patient-visual__button {
+  color: oklch(0.28 0.12 25);
+  border-color: oklch(0.58 0.22 25);
+  box-shadow: 0 0 0 7px oklch(0.58 0.22 25 / 0.18), 0 10px 28px oklch(0.58 0.22 25 / 0.24);
+  animation: patient-emergency-pulse 1.1s ease-in-out infinite;
+}
+
+.patient-visual--emergency .patient-visual__new-dot {
+  background: oklch(0.58 0.22 25);
+  animation: patient-emergency-pulse 1.1s ease-in-out infinite;
+}
+
 .patient-visual__new-dot {
   position: absolute;
   top: 3px;
@@ -334,6 +346,23 @@
   font-size: 0.9rem;
 }
 
+.patient-guidance-panel__emergency,
+.patient-guidance-panel__solved {
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.5rem;
+  font-weight: 700;
+}
+
+.patient-guidance-panel__emergency {
+  color: oklch(0.42 0.18 25) !important;
+  background: oklch(0.95 0.08 25);
+}
+
+.patient-guidance-panel__solved {
+  color: oklch(0.45 0.16 145) !important;
+  background: oklch(0.94 0.08 145);
+}
+
 .patient-guidance-panel__next {
   gap: 0.35rem;
   margin-top: 0.8rem;
@@ -369,6 +398,11 @@
   50% { transform: scale(1.22); }
 }
 
+@keyframes patient-emergency-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
 @keyframes patient-guidance-open {
   from { opacity: 0; transform: translateY(-6px) scale(0.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
@@ -380,7 +414,8 @@
   .patient-visual__smile,
   .patient-visual__ring,
   .patient-guidance-panel,
-  .patient-visual__new-dot {
+  .patient-visual__new-dot,
+  .patient-visual--emergency .patient-visual__button {
     animation: none;
   }
 }

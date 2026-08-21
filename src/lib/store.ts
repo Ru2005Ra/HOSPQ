@@ -93,6 +93,7 @@ export interface QueueTicket {
   // Assigned doctor for the consultation.
   assignedDoctorId?: string;
   assignedDoctorName?: string;
+  calledAt?: number;
 
   diagnosis?: string;
   prescription?: { medicineId?: string; name: string; qty: number; price: number; transfer?: boolean }[];
@@ -281,6 +282,9 @@ function read(): DB {
 function pruneExpiredWaitingTickets(data: DB): DB {
   const next = { ...data, queue: [...(data.queue ?? [])] };
   next.queue = next.queue.filter((ticket) => {
+    if (ticket.status === "with-doctor" && ticket.calledAt && Date.now() > ticket.calledAt + 3 * 60 * 1000) {
+      return false;
+    }
     if (ticket.status !== "waiting") return true;
     if (ticket.resumeAfterLogout === true) return true;
     const peopleAhead = next.queue.filter((item) => item.status === "waiting" && item.createdAt < ticket.createdAt).length;
@@ -663,6 +667,7 @@ export const db = {
     if (!assigned) return null;
 
     next.status = "with-doctor";
+    next.calledAt = Date.now();
     next.assignedDoctorId = assigned?.id;
     next.assignedDoctorName = assigned ? `${assigned.firstName} ${assigned.lastName}` : undefined;
 
@@ -683,6 +688,7 @@ export const db = {
     if (next.assignedDoctorId && next.assignedDoctorId !== doctorId) return null;
 
     next.status = "with-doctor";
+    next.calledAt = Date.now();
     next.assignedDoctorId = doctorId;
     next.assignedDoctorName = `${doctor.firstName} ${doctor.lastName}`;
 
@@ -835,10 +841,13 @@ export const db = {
 
   clearEmergency(departmentCode: string) {
     const d = read();
-    d.emergencyAlert = null;
+    const current = d.emergencyAlert;
+    d.emergencyAlert = current?.departmentCode === departmentCode
+      ? { ...current, active: false }
+      : current;
     d.queue.forEach(ticket => {
       if (ticket.departmentCode === departmentCode) {
-        ticket.emergencyAlert = null;
+        ticket.emergencyAlert = ticket.emergencyAlert ? { ...ticket.emergencyAlert, active: false } : null;
       }
     });
     write(d);
