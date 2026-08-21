@@ -30,7 +30,7 @@ function Page() {
     if (!user) return 0;
     const doctor = d.users?.find((u: any) => u.id === user.id && u.role === "doctor");
     const codes = doctor?.departmentCodes ?? [];
-    return d.queue?.filter((t: any) => t.status === "waiting" && t.receptionApproved === true && t.vitals?.weight && t.vitals?.temperature && t.vitals?.bloodPressure && codes.includes(t.departmentCode)).length ?? 0;
+    return d.queue?.filter((t: any) => t.status === "waiting" && t.receptionApproved === true && (t.vitals?.weight && t.vitals?.temperature && t.vitals?.bloodPressure || t.emergencyAlert?.active === true) && codes.includes(t.departmentCode)).length ?? 0;
   });
   const completed = useDb((d) => d.queue?.filter((t: any) => t.status === "done" || t.status === "removed") ?? []);
   const [diagnosis, setDiagnosis] = useState("");
