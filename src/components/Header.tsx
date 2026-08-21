@@ -3,7 +3,7 @@ import { Activity, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/hooks";
 import { db, type Role } from "@/lib/store";
-import { getLang, setLang, useT } from "@/lib/i18n";
+import { getLang, setLang, useT, type TKey } from "@/lib/i18n";
 
 const ROLE_HOME: Record<Role, string> = {
   patient: "/patient",
@@ -14,13 +14,13 @@ const ROLE_HOME: Record<Role, string> = {
   manager: "/manager",
 };
 
-const ROLE_LABEL: Record<Role, string> = {
-  patient: "Patient",
-  doctor: "Doctor",
-  reception: "Reception",
-  storekeeper: "Pharmacy",
-  laboratory: "Laboratory",
-  manager: "Manager",
+const ROLE_LABEL: Record<Role, TKey> = {
+  patient: "role_patient_label",
+  doctor: "role_doctor_label",
+  reception: "role_reception_label",
+  storekeeper: "role_pharmacy_label",
+  laboratory: "role_laboratory_label",
+  manager: "role_manager_label",
 };
 
 export function Header() {
@@ -46,7 +46,7 @@ export function Header() {
             onClick={() => setLang(lang === "en" ? "rw" : "en")}
             className="rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-secondary"
           >
-            {lang === "en" ? "🇷🇼 Kinyarwanda" : "🇬🇧 English"}
+            {lang === "en" ? `🇷🇼 ${tr("language_kinyarwanda")}` : `🇬🇧 ${tr("language_english")}`}
           </button>
 
           {user ? (
@@ -55,7 +55,7 @@ export function Header() {
                 to={ROLE_HOME[user.role]}
                 className="text-sm font-medium text-foreground hover:text-accent"
               >
-                {ROLE_LABEL[user.role]} {tr("dashboard")}
+                {tr(ROLE_LABEL[user.role])} {tr("dashboard")}
               </Link>
               <Button
                 variant="outline"

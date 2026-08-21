@@ -56,9 +56,9 @@ function Page() {
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{tr("manager_title")}</h1>
         <Tabs defaultValue="staff" className="mt-6">
           <TabsList>
-            <TabsTrigger value="staff">Staff Management</TabsTrigger>
-            <TabsTrigger value="patients">Patients Report</TabsTrigger>
-            <TabsTrigger value="doctor-work">Doctor Daily Work</TabsTrigger>
+            <TabsTrigger value="staff">{tr("staff_management")}</TabsTrigger>
+            <TabsTrigger value="patients">{tr("patients_report")}</TabsTrigger>
+            <TabsTrigger value="doctor-work">{tr("doctor_daily_work")}</TabsTrigger>
             <TabsTrigger value="attendance">{tr("attendance_tab")}</TabsTrigger>
           </TabsList>
           <TabsContent value="staff" className="mt-6"><StaffTab /></TabsContent>
@@ -97,10 +97,10 @@ function StaffTab() {
     try {
       if (editId) {
         db.updateStaffUser(editId, f);
-        toast.success("Staff updated");
+        toast.success(tr("staff_updated"));
       } else {
         db.addStaffUser(f);
-        toast.success("Staff added");
+        toast.success(tr("staff_added"));
       }
       setF(EMPTY); setEditId(null);
     } catch (err: any) { toast.error(err.message); }
@@ -120,7 +120,7 @@ function StaffTab() {
 
 
   const remove = (id: string, name: string) => {
-    if (confirm(`Delete ${name}?`)) { db.deleteStaffUser(id); toast.success("Staff removed"); }
+    if (confirm(tr("delete_staff", { name }))) { db.deleteStaffUser(id); toast.success(tr("staff_removed")); }
   };
 
   const exportPdf = () => {
@@ -150,13 +150,13 @@ function StaffTab() {
       <div className="grid gap-4">
         <div className="flex items-center justify-between">
           <div className="flex gap-2">
-            <button onClick={() => setFilterRole("all")} className={`rounded-full px-3 py-1 text-xs font-medium border ${filterRole === "all" ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:bg-secondary"}`}>All</button>
+            <button onClick={() => setFilterRole("all")} className={`rounded-full px-3 py-1 text-xs font-medium border ${filterRole === "all" ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:bg-secondary"}`}>{tr("all")}</button>
             {STAFF_ROLES.map(r => (
               <button key={r.value} onClick={() => setFilterRole(r.value)} className={`rounded-full px-3 py-1 text-xs font-medium border ${filterRole === r.value ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:bg-secondary"}`}>{r.label}</button>
             ))}
           </div>
           <Button size="sm" onClick={exportPdf} className="bg-accent text-accent-foreground hover:bg-accent/90">
-            <Download className="mr-1 h-4 w-4" /> Export PDF
+            <Download className="mr-1 h-4 w-4" /> {tr("export_pdf")}
           </Button>
         </div>
 
@@ -172,7 +172,7 @@ function StaffTab() {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No staff found.</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">{tr("no_staff")}</td></tr>}
               {filtered.map(u => (
                 <tr key={u.id} className="border-t border-border">
                   <td className="p-3 font-medium">{u.firstName} {u.lastName}</td>
@@ -196,7 +196,7 @@ function StaffTab() {
 
       {/* Form */}
       <form onSubmit={save} className="grid gap-3 rounded-xl border border-border bg-card p-5 shadow-[var(--shadow-card)] h-fit">
-        <h3 className="font-semibold text-foreground">{editId ? "Edit Staff" : "Add Staff"}</h3>
+        <h3 className="font-semibold text-foreground">{editId ? tr("edit_staff") : tr("add_staff")}</h3>
         <div>
           <Label>Role</Label>
           <select className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={f.role} onChange={e => setF({ ...f, role: e.target.value as Role })} disabled={!!editId}>
@@ -206,9 +206,9 @@ function StaffTab() {
 
         {f.role === "doctor" && (
           <div className="rounded-lg border border-border bg-background p-3">
-            <Label>Departments / Diseases treated</Label>
+            <Label>{tr("departments_treated")}</Label>
             <p className="mt-1 text-xs text-muted-foreground">
-              Select departments/diseases this doctor can treat. Patients will be routed to a matching doctor.
+              {tr("departments_treated_desc")}
             </p>
 
             <div className="mt-3 grid gap-2">
@@ -233,7 +233,7 @@ function StaffTab() {
             </div>
 
             <p className="mt-2 text-xs text-muted-foreground">
-              Emergency (MH) is also included (Emergency department code in the system).
+              {tr("emergency_department_note")}
             </p>
           </div>
         )}
@@ -263,6 +263,7 @@ function StaffTab() {
 }
 
 function PatientsTab() {
+  const tr = useT();
   const patients = useDb((d) => d.queue?.filter((t: any) => t.status === "done" || t.status === "removed") ?? []);
 
   const exportPdf = () => {
@@ -283,23 +284,23 @@ function PatientsTab() {
       headStyles: { fillColor: [15, 27, 61] },
     });
     doc.save(`hospiq-patients-${new Date().toISOString().slice(0, 10)}.pdf`);
-    toast.success("Patient report exported");
+    toast.success(tr("patient_report_exported"));
   };
 
   return (
     <div className="grid gap-6">
       <div className="flex justify-end">
         <Button size="sm" onClick={exportPdf} className="bg-accent text-accent-foreground hover:bg-accent/90">
-          <Download className="mr-1 h-4 w-4" /> Export patient report
+          <Download className="mr-1 h-4 w-4" /> {tr("export_patient_report")}
         </Button>
       </div>
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
         <table className="w-full text-sm">
           <thead className="bg-secondary text-left text-muted-foreground">
-            <tr><th className="p-3">Patient</th><th className="p-3">Date</th><th className="p-3">Department</th><th className="p-3">Insurance</th><th className="p-3">Status</th></tr>
+            <tr><th className="p-3">{tr("patient_col")}</th><th className="p-3">{tr("date_col")}</th><th className="p-3">{tr("department")}</th><th className="p-3">{tr("insurance_col")}</th><th className="p-3">{tr("status")}</th></tr>
           </thead>
           <tbody>
-            {patients.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No patient service records yet.</td></tr>}
+            {patients.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">{tr("no_patient_records")}</td></tr>}
             {patients.map((p: any) => (
               <tr key={p.id} className="border-t border-border">
                 <td className="p-3">{p.patientName}</td>
@@ -317,6 +318,7 @@ function PatientsTab() {
 }
 
 function DoctorWorkTab() {
+  const tr = useT();
   const doctorWork = useDb((d) => {
     const map = new Map<string, { doctorId: string; doctorName: string; date: string; total: number; patients: string[]; departments: string[]; transfers: { patient: string; date: string }[] }>();
 
@@ -355,14 +357,14 @@ function DoctorWorkTab() {
             <tr>
               <th className="p-3">Doctor</th>
               <th className="p-3">Date</th>
-              <th className="p-3">Total patients</th>
-              <th className="p-3">Patients</th>
-              <th className="p-3">Department</th>
-              <th className="p-3">Transfer</th>
+              <th className="p-3">{tr("total_patients")}</th>
+              <th className="p-3">{tr("patient_col")}</th>
+              <th className="p-3">{tr("department")}</th>
+              <th className="p-3">{tr("transfer")}</th>
             </tr>
           </thead>
           <tbody>
-            {doctorWork.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No daily doctor work recorded yet.</td></tr>}
+            {doctorWork.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">{tr("no_daily_doctor_work")}</td></tr>}
             {doctorWork.map((row) => (
               <tr key={`${row.doctorId}-${row.date}`} className="border-t border-border align-top">
                 <td className="p-3 font-medium">{row.doctorName}</td>
@@ -377,7 +379,7 @@ function DoctorWorkTab() {
                     <div className="space-y-1">
                       {row.transfers.map((item, idx) => (
                         <div key={`${item.patient}-${idx}`} className="rounded bg-orange-50 px-2 py-1 text-orange-700">
-                          {item.patient} — Yes ({item.date})
+                          {item.patient} — {tr("yes")} ({item.date})
                         </div>
                       ))}
                     </div>

@@ -49,13 +49,13 @@ function PatientHome() {
     setLastStatus(ticket.status);
     const room = DEPARTMENTS.find(d => d.code === ticket.departmentCode)?.room ?? "consultation room";
     const doctorName = ticket.assignedDoctorName ? `Dr. ${ticket.assignedDoctorName}` : "the selected doctor";
-    if (ticket.status === "waiting") toast(`✅ Token ${ticket.token} ready — head to reception desk.`);
-    if (ticket.status === "with-doctor") toast(`🩺 ${doctorName} is ready. Please go to ${room}.`);
-    if (ticket.status === "paying") toast(`💳 Consultation done. Please pay at the cashier.`);
-    if (ticket.status === "pharmacy") toast(`💊 Go to pharmacy to collect your medicines.`);
-    if (ticket.status === "done") toast(`🎉 Visit complete. Thank you for using HospiQ!`);
+    if (ticket.status === "waiting") toast(`✅ ${tr("token_ready", { token: ticket.token })}`);
+    if (ticket.status === "with-doctor") toast(`🩺 ${tr("doctor_ready", { doctor: doctorName, room })}`);
+    if (ticket.status === "paying") toast(`💳 ${tr("consultation_done")}`);
+    if (ticket.status === "pharmacy") toast(`💊 ${tr("collect_medicines")}`);
+    if (ticket.status === "done") toast(`🎉 ${tr("visit_complete")}`);
     if (emergencyNotice && emergencyNotice.departmentCode === ticket.departmentCode && emergencyNotice.active) {
-      toast(`⚠ Emergency case in ${DEPARTMENTS.find(d => d.code === emergencyNotice.departmentCode)?.name ?? "this department"}. Please wait and stay close.`);
+      toast(`⚠ ${tr("emergency_case_wait")}`);
     }
   }, [ticket, lastStatus, emergencyNotice]);
 
@@ -71,7 +71,7 @@ function PatientHome() {
 
   const emergencyForDepartment = !!(emergencyNotice && emergencyNotice.departmentCode === ticket?.departmentCode && emergencyNotice.active);
   const roomMessage = ticket && ticket.assignedDoctorName && ticket.status === "waiting"
-    ? `Assigned doctor: Dr. ${ticket.assignedDoctorName}. Please wait in the ${DEPARTMENTS.find(d => d.code === ticket.departmentCode)?.room ?? "consultation room"}.`
+    ? tr("assigned_doctor", { doctor: ticket.assignedDoctorName, room: DEPARTMENTS.find(d => d.code === ticket.departmentCode)?.room ?? "consultation room" })
     : null;
 
   return (
@@ -82,12 +82,12 @@ function PatientHome() {
         <p className="mt-2 text-muted-foreground">{tr("manage_visit")}</p>
         {vitalsPending && (
           <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm">
-            Please wait at reception. Your weight, temperature, and blood pressure must be recorded before you can move forward.
+            {tr("vitals_required")}
           </div>
         )}
         {emergencyForDepartment && (
           <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-sm">
-            Emergency in progress in this department. Please wait for the reception team to clear the emergency case before the queue resumes.
+            {tr("emergency_active")}
           </div>
         )}
         {roomMessage && (
@@ -119,7 +119,7 @@ function StartVisit() {
   const submitLocation = (e: React.FormEvent) => {
     e.preventDefault();
     if (!location.province || !location.district || !location.sector)
-      return toast.error("Please fill in province, district, and village fields");
+      return toast.error(tr("location_required"));
     setStep("dept");
   };
 
@@ -130,7 +130,7 @@ function StartVisit() {
     const t = db.enqueue(user, departmentCode, insurance, {});
     const pos = db.all().queue.filter((x: any) => x.departmentCode === departmentCode && x.status === "waiting").length;
     const waitMin = pos * 5;
-    toast.success(`Token #${t.token} — estimated wait: ${waitMin} min`);
+    toast.success(tr("token_wait", { token: t.token, minutes: waitMin }));
   };
 
   if (step === "choice") return (
@@ -152,9 +152,9 @@ function StartVisit() {
       <div className="px-6 py-5 border-b border-border bg-secondary">
         <div className="flex items-center gap-2">
           <MapPin className="h-5 w-5 text-accent" />
-          <h2 className="text-xl font-semibold text-foreground">Your Location</h2>
+          <h2 className="text-xl font-semibold text-foreground">{tr("location_title")}</h2>
         </div>
-        <p className="text-sm text-muted-foreground mt-1">This helps us identify you correctly. Please select your province, district, sector and cell.</p>
+        <p className="text-sm text-muted-foreground mt-1">{tr("location_desc")}</p>
       </div>
 
       {/* Content */}
@@ -162,7 +162,7 @@ function StartVisit() {
         <div className="grid grid-cols-3 gap-4">
           {/* Province */}
           <div>
-            <Label className="text-sm font-semibold text-foreground">Province <span className="text-accent">*</span></Label>
+            <Label className="text-sm font-semibold text-foreground">{tr("province")} <span className="text-accent">*</span></Label>
             <select
               required
               value={location.province}
@@ -172,14 +172,14 @@ function StartVisit() {
               }}
               className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent/50"
             >
-              <option value="">Select province</option>
+              <option value="">{tr("select_province")}</option>
               {getProvinces().map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
 
           {/* District */}
           <div>
-            <Label className="text-sm font-semibold text-foreground">District <span className="text-accent">*</span></Label>
+            <Label className="text-sm font-semibold text-foreground">{tr("district")} <span className="text-accent">*</span></Label>
             <select
               required
               disabled={!location.province}
@@ -190,14 +190,14 @@ function StartVisit() {
               }}
               className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent/50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <option value="">Select district</option>
+              <option value="">{tr("select_district")}</option>
               {location.province && getDistricts(location.province).map(d => <option key={d} value={d}>{d}</option>)}
             </select>
           </div>
 
           {/* Sector/Village */}
           <div>
-            <Label className="text-sm font-semibold text-foreground">Village <span className="text-accent">*</span></Label>
+            <Label className="text-sm font-semibold text-foreground">{tr("village")} <span className="text-accent">*</span></Label>
             <select
               required
               disabled={!location.district}
@@ -208,7 +208,7 @@ function StartVisit() {
               }}
               className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent/50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <option value="">Select village</option>
+              <option value="">{tr("select_village")}</option>
               {location.province && location.district && getSectors(location.province, location.district).map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
@@ -216,13 +216,13 @@ function StartVisit() {
 
         {/* Cell/Sector (if needed) */}
         <div>
-          <Label className="text-sm font-semibold text-foreground">Cell / Sector Detail</Label>
+          <Label className="text-sm font-semibold text-foreground">{tr("cell_sector_detail")}</Label>
           <select
             value={location.cell}
             onChange={e => setLocation({ ...location, cell: e.target.value })}
             className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent/50"
           >
-            <option value="">Select cell or leave blank</option>
+            <option value="">{tr("select_cell")}</option>
             {location.province && location.district && location.sector && getVillages(location.province, location.district, location.sector).map(v => <option key={v} value={v}>{v}</option>)}
           </select>
         </div>
@@ -236,7 +236,7 @@ function StartVisit() {
           disabled={!location.province || !location.district || !location.sector}
           className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 disabled:opacity-50"
         >
-          Next →
+          {tr("next")} →
         </Button>
       </div>
     </form>
@@ -309,15 +309,15 @@ function TokenCard({ ticket }: { ticket: QueueTicket }) {
           </p>
           <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-secondary px-4 py-2 text-sm font-semibold text-foreground">
             <Clock3 className="h-4 w-4 text-accent" />
-            Estimated wait: <span className="text-accent">{estimatedWaitMin} min</span>
+            {tr("estimated_wait")} <span className="text-accent">{estimatedWaitMin} min</span>
           </div>
           {ahead > 0 && (
             <div className="mt-3 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold ml-2"
               style={{ background: green ? "color-mix(in oklab, var(--success) 15%, transparent)" : "color-mix(in oklab, var(--destructive) 15%, transparent)", color: green ? "var(--success)" : "var(--destructive)" }}>
-              <Clock3 className="h-4 w-4" /> <span className="font-mono font-bold">{emergencyPause ? "Paused" : fmtDurationWithSeconds(remaining)}</span> {emergencyPause ? "Emergency pause" : (green ? tr("you_have_time") : tr("stay_nearby"))}
+              <Clock3 className="h-4 w-4" /> <span className="font-mono font-bold">{emergencyPause ? tr("paused") : fmtDurationWithSeconds(remaining)}</span> {emergencyPause ? tr("emergency_pause") : (green ? tr("you_have_time") : tr("stay_nearby"))}
             </div>
           )}
-          {ahead === 0 && <p className="mt-3 text-sm font-semibold text-destructive">{emergencyPause ? "Emergency pause — please wait" : tr("stay_close")}</p>}
+          {ahead === 0 && <p className="mt-3 text-sm font-semibold text-destructive">{emergencyPause ? tr("emergency_pause_wait") : tr("stay_close")}</p>}
         </>
       )}
     </div>
@@ -328,33 +328,34 @@ function TokenCard({ ticket }: { ticket: QueueTicket }) {
 
 
 function VisitStagesTable({ ticket }: { ticket: QueueTicket }) {
+  const tr = useT();
   const stages = [
     // Reception is considered done once the patient leaves the waiting queue.
-    { name: "Reception", desc: "Registration, vitals & insurance", done: ticket.status !== "waiting", active: ticket.status === "waiting" },
+    { name: tr("reception_stage"), desc: tr("reception_stage_desc"), done: ticket.status !== "waiting", active: ticket.status === "waiting" },
     // Doctor is active during consultation.
-    { name: "Doctor", desc: "Consultation & diagnosis", done: ["paying", "pharmacy", "done"].includes(ticket.status), active: ticket.status === "with-doctor" },
+    { name: tr("doctor_stage"), desc: tr("doctor_stage_desc"), done: ["paying", "pharmacy", "done"].includes(ticket.status), active: ticket.status === "with-doctor" },
     // Laboratory isn't a real status in the queue right now, so we mark it as:
     // - pending while waiting/with-doctor
     // - done once the workflow reaches payment or beyond.
-    { name: "Laboratory", desc: "Lab tests (if required)", done: ["paying", "pharmacy", "done"].includes(ticket.status), active: false },
-    { name: "Payment", desc: "Pay at cashier", done: ["pharmacy", "done"].includes(ticket.status), active: ticket.status === "paying" },
-    { name: "Pharmacy", desc: "Collect medicines", done: ticket.status === "done", active: ticket.status === "pharmacy" },
+    { name: tr("laboratory_stage"), desc: tr("laboratory_stage_desc"), done: ["paying", "pharmacy", "done"].includes(ticket.status), active: false },
+    { name: tr("payment_stage"), desc: tr("payment_stage_desc"), done: ["pharmacy", "done"].includes(ticket.status), active: ticket.status === "paying" },
+    { name: tr("pharmacy_stage"), desc: tr("pharmacy_stage_desc"), done: ticket.status === "done", active: ticket.status === "pharmacy" },
   ];
 
 
   return (
     <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)] overflow-hidden">
       <div className="px-5 py-4 border-b border-border">
-        <h2 className="text-base font-semibold text-foreground">Visit Progress — Step by Step</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">Follow each stage of your hospital visit</p>
+        <h2 className="text-base font-semibold text-foreground">{tr("visit_progress")}</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">{tr("visit_progress_desc")}</p>
       </div>
       <table className="w-full text-sm">
         <thead className="bg-secondary text-left text-muted-foreground">
           <tr>
-            <th className="p-3">Step</th>
-            <th className="p-3">Stage</th>
-            <th className="p-3">Description</th>
-            <th className="p-3 text-center">Status</th>
+            <th className="p-3">{tr("step")}</th>
+            <th className="p-3">{tr("stage")}</th>
+            <th className="p-3">{tr("description")}</th>
+            <th className="p-3 text-center">{tr("status")}</th>
           </tr>
         </thead>
         <tbody>
@@ -366,15 +367,15 @@ function VisitStagesTable({ ticket }: { ticket: QueueTicket }) {
               <td className="p-3 text-center">
                 {s.done ? (
                   <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
-                    <CheckCheck className="h-3 w-3" /> Done
+                    <CheckCheck className="h-3 w-3" /> {tr("done")}
                   </span>
                 ) : s.active ? (
                   <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
-                    <Loader2 className="h-3 w-3 animate-spin" /> In progress
+                    <Loader2 className="h-3 w-3 animate-spin" /> {tr("in_progress")}
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold text-muted-foreground">
-                    <X className="h-3 w-3" /> Pending
+                    <X className="h-3 w-3" /> {tr("pending")}
                   </span>
                 )}
               </td>
@@ -405,7 +406,7 @@ function PaymentPanel({ ticketId }: { ticketId: string }) {
       if (`+250${phone}` !== user?.phone) return toast.error(tr("phone_mismatch"));
     }
     db.recordPayment(ticketId, patientPayable, paymentMethod);
-    toast.success(`Payment confirmed: ${patientPayable.toLocaleString()} RWF via ${paymentMethod === "mobile" ? "mobile money" : "cash"}.`);
+    toast.success(tr("payment_confirmed", { amount: patientPayable, method: paymentMethod === "mobile" ? tr("mobile_money") : tr("cash") }));
   };
 
   return (
@@ -420,7 +421,7 @@ function PaymentPanel({ ticketId }: { ticketId: string }) {
         </div>
         <div className="p-6">
           {(ticket.prescription ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">No medicines prescribed.</p>
+            <p className="text-sm text-muted-foreground">{tr("no_medicines")}</p>
           ) : (
             <>
               <div className="space-y-3">
@@ -432,7 +433,7 @@ function PaymentPanel({ ticketId }: { ticketId: string }) {
                       </p>
                       {p.transfer && (
                         <span className="inline-block mt-1 rounded-full bg-orange-100 px-2 py-0.5 text-xs text-orange-700">
-                          Buy outside
+                          {tr("buy_outside_short")}
                         </span>
                       )}
                     </div>
@@ -446,7 +447,7 @@ function PaymentPanel({ ticketId }: { ticketId: string }) {
               {/* Total Section */}
               <div className="mt-4 pt-4 border-t border-border">
                 <div className="flex justify-between items-center">
-                  <span className="font-semibold text-foreground">Total</span>
+                  <span className="font-semibold text-foreground">{tr("total_label")}</span>
                   <span className="text-lg font-bold text-accent">{patientPayable.toLocaleString()} RWF</span>
                 </div>
               </div>
@@ -466,18 +467,18 @@ function PaymentPanel({ ticketId }: { ticketId: string }) {
           <div className="mb-4 grid gap-2 sm:grid-cols-2">
             <label className={`rounded-lg border p-3 cursor-pointer ${paymentMethod === "mobile" ? "border-accent bg-accent/5" : "border-border bg-secondary"}`}>
               <input type="radio" name="paymentMethod" checked={paymentMethod === "mobile"} onChange={() => setPaymentMethod("mobile")} className="mr-2" />
-              Mobile money
+              {tr("mobile_money")}
             </label>
             <label className={`rounded-lg border p-3 cursor-pointer ${paymentMethod === "cash" ? "border-accent bg-accent/5" : "border-border bg-secondary"}`}>
               <input type="radio" name="paymentMethod" checked={paymentMethod === "cash"} onChange={() => setPaymentMethod("cash")} className="mr-2" />
-              Cash at pharmacy
+              {tr("cash_at_pharmacy")}
             </label>
           </div>
 
           {paymentMethod === "mobile" && (
             <>
               <p className="text-sm text-muted-foreground mb-5">
-                Enter your registered phone number to confirm payment of <strong>{patientPayable.toLocaleString()} RWF</strong>.
+                {tr("enter_phone_payment", { amount: patientPayable })}
               </p>
               <div className="flex gap-2 mb-4">
                 <div className="flex items-center rounded-md border border-input bg-secondary px-3 text-sm font-medium text-foreground whitespace-nowrap">
@@ -498,7 +499,7 @@ function PaymentPanel({ ticketId }: { ticketId: string }) {
 
           {paymentMethod === "cash" && (
             <p className="text-sm text-muted-foreground mb-5">
-              You will pay <strong>{patientPayable.toLocaleString()} RWF</strong> in cash at the pharmacy counter. The pharmacy staff will confirm it on their dashboard.
+              {tr("cash_payment_note", { amount: patientPayable })}
             </p>
           )}
 
@@ -511,7 +512,7 @@ function PaymentPanel({ ticketId }: { ticketId: string }) {
               className="mt-1 accent-accent cursor-pointer"
             />
             <label htmlFor="confirm-pay" className="text-sm text-foreground cursor-pointer">
-              I confirm I want to pay <strong>{patientPayable.toLocaleString()} RWF</strong> for my prescription medicines.
+              {tr("confirm_payment", { amount: patientPayable })}
             </label>
           </div>
 
@@ -527,7 +528,7 @@ function PaymentPanel({ ticketId }: { ticketId: string }) {
 
       {total === 0 && (
         <Button onClick={() => db.recordPayment(ticketId, 0, "cash")} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
-          Proceed to Pharmacy →
+          {tr("proceed_pharmacy")}
         </Button>
       )}
     </div>

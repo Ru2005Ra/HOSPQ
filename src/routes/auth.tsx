@@ -37,8 +37,8 @@ function Auth() {
       <Header />
       <main className="mx-auto grid max-w-md gap-6 px-4 py-12">
         <div className="text-center">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Skip the line.</h1>
-          <p className="mt-1 text-base text-muted-foreground">Get back to your day.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">{tr("skip_line")}</h1>
+          <p className="mt-1 text-base text-muted-foreground">{tr("get_back_day")}</p>
         </div>
 
         {mode === "login" ? (
@@ -84,13 +84,13 @@ function UnifiedLogin({ onSuccess, onSwitchToRegister }: { onSuccess: (r: Role) 
     <div className="rounded-xl border border-border bg-card p-8 shadow-[var(--shadow-card)]">
       {/* Header */}
       <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold text-foreground">Login to your account</h2>
+        <h2 className="text-2xl font-bold text-foreground">{tr("login_account")}</h2>
       </div>
 
       <form onSubmit={handleLogin} className="space-y-5">
         {/* Username Field */}
         <div>
-          <Label className="text-sm font-semibold text-foreground">Username</Label>
+          <Label className="text-sm font-semibold text-foreground">{tr("username")}</Label>
           <Input
             required
             autoComplete="username"
@@ -130,7 +130,7 @@ function UnifiedLogin({ onSuccess, onSwitchToRegister }: { onSuccess: (r: Role) 
             onClick={() => setForgotMode(true)}
             className="text-sm text-accent hover:underline font-medium"
           >
-            Forgot password?
+            {tr("forgot_password")}
           </button>
         </div>
 
@@ -140,14 +140,14 @@ function UnifiedLogin({ onSuccess, onSwitchToRegister }: { onSuccess: (r: Role) 
           disabled={isLoading}
           className="w-full bg-accent text-accent-foreground hover:bg-accent/90 py-2.5 font-semibold text-base"
         >
-          {isLoading ? "Logging in..." : "Login"}
+          {isLoading ? tr("logging_in") : tr("login")}
         </Button>
       </form>
 
       {/* Divider */}
       <div className="my-6 flex items-center gap-3">
         <div className="flex-1 h-px bg-border" />
-        <span className="text-xs text-muted-foreground">New to HospiQ?</span>
+        <span className="text-xs text-muted-foreground">{tr("new_to_hospiq")}</span>
         <div className="flex-1 h-px bg-border" />
       </div>
 
@@ -157,7 +157,7 @@ function UnifiedLogin({ onSuccess, onSwitchToRegister }: { onSuccess: (r: Role) 
         onClick={onSwitchToRegister}
         className="w-full py-2.5 px-4 rounded-lg border border-border text-foreground font-semibold hover:bg-secondary transition-colors"
       >
-        Create a new account
+        {tr("create_new_account")}
       </button>
     </div>
   );
@@ -183,23 +183,23 @@ function PatientRegister({ onSuccess, onSwitchToLogin }: { onSuccess: (r: Role) 
     e.preventDefault();
     
     if (!form.username.trim()) {
-      return toast.error("Username is required");
+      return toast.error(tr("username_required"));
     }
 
     if (!form.firstName.trim() || !form.lastName.trim()) {
-      return toast.error("First and last names are required");
+      return toast.error(tr("first_last_required"));
     }
 
     if (!validatePhone(form.carrier, form.phone)) {
-      return toast.error("Phone must be 9 digits and start with 78/79 for MTN or 72/73 for Airtel.");
+      return toast.error(tr("phone_carrier_error"));
     }
 
     if (form.password.length < 6) {
-      return toast.error("Password must be at least 6 characters");
+      return toast.error(tr("password_error"));
     }
 
     if (form.password !== form.confirmPassword) {
-      return toast.error("Passwords do not match");
+      return toast.error(tr("passwords_mismatch"));
     }
 
     setIsLoading(true);
@@ -212,7 +212,7 @@ function PatientRegister({ onSuccess, onSwitchToLogin }: { onSuccess: (r: Role) 
         password: form.password,
         sex: form.sex,
       });
-      toast.success("Account created successfully! Logging you in...");
+      toast.success(tr("account_created_login"));
       
       // Auto-login after registration using username and password
       const user = db.login(form.username.trim(), form.password);
@@ -228,13 +228,13 @@ function PatientRegister({ onSuccess, onSwitchToLogin }: { onSuccess: (r: Role) 
     <div className="rounded-xl border border-border bg-card p-8 shadow-[var(--shadow-card)]">
       {/* Header */}
       <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold text-foreground">Create a new account</h2>
+        <h2 className="text-2xl font-bold text-foreground">{tr("create_new_account")}</h2>
       </div>
 
       <form onSubmit={handleRegister} className="space-y-5">
         {/* Username Field */}
         <div>
-          <Label className="text-sm font-semibold text-foreground">Username</Label>
+          <Label className="text-sm font-semibold text-foreground">{tr("username")}</Label>
           <Input
             required
             value={form.username}
@@ -337,7 +337,7 @@ function PatientRegister({ onSuccess, onSwitchToLogin }: { onSuccess: (r: Role) 
 
         {/* Confirm Password */}
         <div>
-          <Label className="text-sm font-semibold text-foreground">Confirm Password</Label>
+          <Label className="text-sm font-semibold text-foreground">{tr("confirm_password_title")}</Label>
           <Input
             required
             type="password"
@@ -354,14 +354,14 @@ function PatientRegister({ onSuccess, onSwitchToLogin }: { onSuccess: (r: Role) 
           disabled={isLoading}
           className="w-full bg-accent text-accent-foreground hover:bg-accent/90 py-2.5 font-semibold text-base"
         >
-          {isLoading ? "Creating account..." : "Create account"}
+          {isLoading ? tr("creating_account") : tr("create_account")}
         </Button>
       </form>
 
       {/* Divider */}
       <div className="my-6 flex items-center gap-3">
         <div className="flex-1 h-px bg-border" />
-        <span className="text-xs text-muted-foreground">Already have an account?</span>
+        <span className="text-xs text-muted-foreground">{tr("already_account")}</span>
         <div className="flex-1 h-px bg-border" />
       </div>
 
@@ -371,7 +371,7 @@ function PatientRegister({ onSuccess, onSwitchToLogin }: { onSuccess: (r: Role) 
         onClick={onSwitchToLogin}
         className="w-full py-2.5 px-4 rounded-lg border border-border text-foreground font-semibold hover:bg-secondary transition-colors"
       >
-        Login instead
+        {tr("login_instead")}
       </button>
     </div>
   );
@@ -379,6 +379,7 @@ function PatientRegister({ onSuccess, onSwitchToLogin }: { onSuccess: (r: Role) 
 
 // Unified forgot password handler
 function UnifiedForgotPassword({ onBack }: { onBack: () => void }) {
+  const tr = useT();
   const [mode, setMode] = useState<"staff" | "patient">("staff");
   const [staffForm, setStaffForm] = useState({ username: "", firstName: "", lastName: "", newPassword: "", confirm: "" });
   const [patientForm, setPatientForm] = useState({ firstName: "", lastName: "", phone: "", newPassword: "", confirm: "" });
@@ -387,7 +388,7 @@ function UnifiedForgotPassword({ onBack }: { onBack: () => void }) {
 
   const handleStaffReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (staffForm.newPassword !== staffForm.confirm) return toast.error("Passwords do not match");
+    if (staffForm.newPassword !== staffForm.confirm) return toast.error(tr("passwords_mismatch"));
     
     setIsLoading(true);
     try {
@@ -397,7 +398,7 @@ function UnifiedForgotPassword({ onBack }: { onBack: () => void }) {
         staffForm.lastName.trim(),
         staffForm.newPassword
       );
-      toast.success("Password reset successfully!");
+      toast.success(tr("password_reset"));
       onBack();
     } catch (e: any) {
       toast.error(e.message);
@@ -408,7 +409,7 @@ function UnifiedForgotPassword({ onBack }: { onBack: () => void }) {
 
   const handlePatientReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (patientForm.newPassword !== patientForm.confirm) return toast.error("Passwords do not match");
+    if (patientForm.newPassword !== patientForm.confirm) return toast.error(tr("passwords_mismatch"));
     
     setIsLoading(true);
     try {
@@ -418,7 +419,7 @@ function UnifiedForgotPassword({ onBack }: { onBack: () => void }) {
         patientForm.phone,
         patientForm.newPassword
       );
-      toast.success("Password reset successfully!");
+      toast.success(tr("password_reset"));
       onBack();
     } catch (e: any) {
       toast.error(e.message);
@@ -431,8 +432,8 @@ function UnifiedForgotPassword({ onBack }: { onBack: () => void }) {
     <div className="rounded-xl border border-border bg-card p-8 shadow-[var(--shadow-card)]">
       {/* Header */}
       <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold text-foreground">Reset your password</h2>
-        <p className="mt-2 text-sm text-muted-foreground">Select your account type to reset your password.</p>
+        <h2 className="text-2xl font-bold text-foreground">{tr("reset_password_title")}</h2>
+        <p className="mt-2 text-sm text-muted-foreground">{tr("reset_password_desc")}</p>
       </div>
 
       {/* Mode Tabs */}
@@ -443,7 +444,7 @@ function UnifiedForgotPassword({ onBack }: { onBack: () => void }) {
             mode === "staff" ? "bg-accent text-accent-foreground" : "bg-secondary text-foreground hover:bg-secondary/80"
           }`}
         >
-          Staff
+          {tr("staff")}
         </button>
         <button
           onClick={() => setMode("patient")}
@@ -451,7 +452,7 @@ function UnifiedForgotPassword({ onBack }: { onBack: () => void }) {
             mode === "patient" ? "bg-accent text-accent-foreground" : "bg-secondary text-foreground hover:bg-secondary/80"
           }`}
         >
-          Patient
+          {tr("patient_tab")}
         </button>
       </div>
 
@@ -459,7 +460,7 @@ function UnifiedForgotPassword({ onBack }: { onBack: () => void }) {
       {mode === "staff" && (
         <form onSubmit={handleStaffReset} className="space-y-4">
           <div>
-            <Label>Username</Label>
+            <Label>{tr("username")}</Label>
             <Input
               required
               value={staffForm.username}
@@ -470,7 +471,7 @@ function UnifiedForgotPassword({ onBack }: { onBack: () => void }) {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>First name</Label>
+              <Label>{tr("first_name")}</Label>
               <Input
                 required
                 value={staffForm.firstName}
@@ -480,7 +481,7 @@ function UnifiedForgotPassword({ onBack }: { onBack: () => void }) {
               />
             </div>
             <div>
-              <Label>Last name</Label>
+              <Label>{tr("last_name")}</Label>
               <Input
                 required
                 value={staffForm.lastName}
@@ -491,7 +492,7 @@ function UnifiedForgotPassword({ onBack }: { onBack: () => void }) {
             </div>
           </div>
           <div>
-            <Label>New password</Label>
+            <Label>{tr("new_password")}</Label>
             <div className="relative mt-2">
               <Input
                 required
@@ -510,7 +511,7 @@ function UnifiedForgotPassword({ onBack }: { onBack: () => void }) {
             </div>
           </div>
           <div>
-            <Label>Confirm password</Label>
+            <Label>{tr("confirm_password")}</Label>
             <Input
               required
               type="password"
@@ -522,10 +523,10 @@ function UnifiedForgotPassword({ onBack }: { onBack: () => void }) {
           </div>
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="outline" className="flex-1" onClick={onBack} disabled={isLoading}>
-              Back
+              {tr("back")}
             </Button>
             <Button type="submit" className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90" disabled={isLoading}>
-              {isLoading ? "Resetting..." : "Reset password"}
+              {isLoading ? tr("resetting") : tr("reset_password")}
             </Button>
           </div>
         </form>
@@ -536,7 +537,7 @@ function UnifiedForgotPassword({ onBack }: { onBack: () => void }) {
         <form onSubmit={handlePatientReset} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>First name</Label>
+              <Label>{tr("first_name")}</Label>
               <Input
                 required
                 value={patientForm.firstName}
@@ -546,7 +547,7 @@ function UnifiedForgotPassword({ onBack }: { onBack: () => void }) {
               />
             </div>
             <div>
-              <Label>Last name</Label>
+              <Label>{tr("last_name")}</Label>
               <Input
                 required
                 value={patientForm.lastName}
@@ -557,7 +558,7 @@ function UnifiedForgotPassword({ onBack }: { onBack: () => void }) {
             </div>
           </div>
           <div>
-            <Label>Phone (+250)</Label>
+            <Label>{tr("phone")}</Label>
             <div className="mt-2 flex gap-2">
               <span className="grid place-items-center rounded-md border border-input bg-secondary px-3 text-sm font-medium text-muted-foreground">
                 +250
@@ -573,7 +574,7 @@ function UnifiedForgotPassword({ onBack }: { onBack: () => void }) {
             </div>
           </div>
           <div>
-            <Label>New password</Label>
+            <Label>{tr("new_password")}</Label>
             <div className="relative mt-2">
               <Input
                 required
@@ -592,7 +593,7 @@ function UnifiedForgotPassword({ onBack }: { onBack: () => void }) {
             </div>
           </div>
           <div>
-            <Label>Confirm password</Label>
+            <Label>{tr("confirm_password")}</Label>
             <Input
               required
               type="password"
@@ -604,10 +605,10 @@ function UnifiedForgotPassword({ onBack }: { onBack: () => void }) {
           </div>
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="outline" className="flex-1" onClick={onBack} disabled={isLoading}>
-              Back
+              {tr("back")}
             </Button>
             <Button type="submit" className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90" disabled={isLoading}>
-              {isLoading ? "Resetting..." : "Reset password"}
+              {isLoading ? tr("resetting") : tr("reset_password")}
             </Button>
           </div>
         </form>

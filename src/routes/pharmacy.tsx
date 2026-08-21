@@ -70,18 +70,18 @@ function DispenseTab() {
                 </td>
                 <td className="p-3">
                   {t.paid ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700">✅ {t.paymentMethod === "cash" ? `Cash paid` : `Paid`} — {t.paidAmount?.toLocaleString()} RWF</span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700">✅ {t.paymentMethod === "cash" ? tr("cash") : tr("paid")} — {t.paidAmount?.toLocaleString()} RWF</span>
                   ) : (
                     <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-700">❌ {tr("unpaid")}</span>
                   )}
                 </td>
                 <td className="p-3 text-right">
                   {t.paymentMethod === "cash" && !t.paymentConfirmed ? (
-                    <Button size="sm" onClick={() => { db.confirmCashPayment(t.id, (db.currentUser() ?? { id: "pharmacy-user" }).id); toast.success("Cash payment confirmed"); }} className="bg-amber-600 text-white hover:bg-amber-700">Confirm cash</Button>
+                    <Button size="sm" onClick={() => { db.confirmCashPayment(t.id, (db.currentUser() ?? { id: "pharmacy-user" }).id); toast.success(tr("cash_payment_confirmed")); }} className="bg-amber-600 text-white hover:bg-amber-700">{tr("confirm_cash")}</Button>
                   ) : t.paid ? (
                     <Button size="sm" onClick={() => { db.dispense(t.id); toast.success(tr("dispensed")); }} className="bg-accent text-accent-foreground hover:bg-accent/90">{tr("dispense")}</Button>
                   ) : (
-                    <span className="text-xs text-muted-foreground italic">Awaiting payment</span>
+                    <span className="text-xs text-muted-foreground italic">{tr("awaiting_payment")}</span>
                   )}
                 </td>
               </tr>
@@ -123,7 +123,7 @@ function StockTab() {
                 <td className="p-3">{m.price.toLocaleString()}</td>
                 <td className="p-3 text-right space-x-1">
                   <button onClick={() => { setEditId(m.id); setF({ name: m.name, stock: String(m.stock), price: String(m.price) }); }}><Pencil className="inline h-4 w-4 text-muted-foreground" /></button>
-                  <button onClick={() => { if (confirm("Delete?")) db.deleteMedicine(m.id); }}><Trash2 className="inline h-4 w-4 text-destructive" /></button>
+                  <button onClick={() => { if (confirm(tr("delete_item"))) db.deleteMedicine(m.id); }}><Trash2 className="inline h-4 w-4 text-destructive" /></button>
                 </td>
               </tr>
             ))}

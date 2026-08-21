@@ -30,7 +30,7 @@ function LabPage() {
     doc.setFontSize(10); doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 25);
     autoTable(doc, {
       startY: 32,
-      head: [["#", tr("patient_col"), "Test Ordered", "Status", "Completed Date"]],
+      head: [["#", tr("patient_col"), tr("test_ordered"), tr("status"), tr("completed_date")]],
       body: completed.map(t => [
         `#${t.token}`,
         t.patientName,
@@ -42,7 +42,7 @@ function LabPage() {
       headStyles: { fillColor: [15, 27, 61] },
     });
     doc.save(`hospiq-lab-report-${new Date().toISOString().slice(0, 10)}.pdf`);
-    toast.success("Report exported successfully");
+    toast.success(tr("report_exported"));
   };
 
   return (
@@ -62,9 +62,9 @@ function LabPage() {
               <tr>
                 <th className="p-3">#</th>
                 <th className="p-3">{tr("patient_col")}</th>
-                <th className="p-3">Tests</th>
-                <th className="p-3">Status</th>
-                <th className="p-3">Requested by</th>
+                <th className="p-3">{tr("tests")}</th>
+                <th className="p-3">{tr("status")}</th>
+                <th className="p-3">{tr("requested_by")}</th>
                 <th className="p-3">{tr("actions_col")}</th>
               </tr>
             </thead>
@@ -88,7 +88,7 @@ function LabPage() {
                   </td>
                   <td className="p-3 text-xs">{t.labRequestedTests?.[0]?.requestedByDoctorName || "—"}</td>
                   <td className="p-3 text-right">
-                    <Button size="sm" variant="outline" onClick={() => setResultModal({ ticketId: t.id, ticketName: t.patientName, tests: t.labRequestedTests ?? [] })}>Enter Results</Button>
+                    <Button size="sm" variant="outline" onClick={() => setResultModal({ ticketId: t.id, ticketName: t.patientName, tests: t.labRequestedTests ?? [] })}>{tr("enter_results")}</Button>
                   </td>
                 </tr>
               ))}
@@ -103,6 +103,7 @@ function LabPage() {
 }
 
 function UploadLabDocument({ ticketId, onUploaded }: { ticketId: string; onUploaded?: () => void }) {
+  const tr = useT();
   const [uploading, setUploading] = useState(false);
 
   const handleUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -119,12 +120,12 @@ function UploadLabDocument({ ticketId, onUploaded }: { ticketId: string; onUploa
       });
       setUploading(false);
       onUploaded?.();
-      toast.success("Document uploaded successfully");
+      toast.success(tr("document_uploaded"));
       event.target.value = "";
     };
     reader.onerror = () => {
       setUploading(false);
-      toast.error("Unable to upload the file");
+      toast.error(tr("upload_failed"));
     };
     reader.readAsDataURL(file);
   };
@@ -132,7 +133,7 @@ function UploadLabDocument({ ticketId, onUploaded }: { ticketId: string; onUploa
   return (
     <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-border bg-secondary px-3 py-2 text-xs text-muted-foreground hover:bg-secondary/80">
       <input type="file" accept="image/*,.pdf,.doc,.docx" onChange={handleUpload} className="hidden" />
-      {uploading ? "Uploading..." : "Import image/document"}
+      {uploading ? tr("uploading") : tr("import_document")}
     </label>
   );
 }
@@ -179,23 +180,23 @@ function ResultModal({ ticketId, ticketName, tests, onClose }: ResultModalProps)
         });
       }
     }
-    toast.success("Lab results saved successfully");
+    toast.success(tr("lab_results_saved"));
     onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="w-full max-w-2xl rounded-xl bg-card p-6 shadow-lg max-h-[90vh] overflow-y-auto">
-        <h2 className="text-lg font-semibold mb-2">Enter Lab Results</h2>
+        <h2 className="text-lg font-semibold mb-2">{tr("enter_lab_results")}</h2>
         <p className="text-sm text-muted-foreground mb-4">{ticketName}</p>
 
         <div className="mb-5 rounded-lg border border-dashed border-border bg-secondary/30 p-3">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <p className="text-sm font-medium">Test result images / documents</p>
+            <p className="text-sm font-medium">{tr("result_documents")}</p>
             <UploadLabDocument ticketId={ticketId} onUploaded={refreshDocuments} />
           </div>
           {documents.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No images or documents uploaded yet.</p>
+            <p className="text-xs text-muted-foreground">{tr("no_documents")}</p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               {documents.map((doc: any) => (
@@ -204,7 +205,7 @@ function ResultModal({ ticketId, ticketName, tests, onClose }: ResultModalProps)
                     <img src={doc.dataUrl} alt={doc.name} className="h-28 w-full rounded object-cover" />
                   ) : (
                     <a href={doc.dataUrl} target="_blank" rel="noreferrer" className="flex h-28 items-center justify-center rounded bg-secondary text-xs font-medium text-foreground">
-                      Open document
+                      {tr("open_document")}
                     </a>
                   )}
                   <p className="mt-2 truncate text-[11px] text-muted-foreground">{doc.name}</p>
@@ -220,7 +221,7 @@ function ResultModal({ ticketId, ticketName, tests, onClose }: ResultModalProps)
               <h3 className="font-medium text-foreground mb-3">{test.name}</h3>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <Label className="text-xs">Result</Label>
+                  <Label className="text-xs">{tr("result")}</Label>
                   <Input 
                     placeholder="e.g., 7.5"
                     value={results[test.testId]?.result || ""}
@@ -229,7 +230,7 @@ function ResultModal({ ticketId, ticketName, tests, onClose }: ResultModalProps)
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Unit</Label>
+                  <Label className="text-xs">{tr("unit")}</Label>
                   <Input 
                     placeholder="e.g., mg/dL"
                     value={results[test.testId]?.unit || ""}
@@ -238,7 +239,7 @@ function ResultModal({ ticketId, ticketName, tests, onClose }: ResultModalProps)
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Normal Range</Label>
+                  <Label className="text-xs">{tr("normal_range")}</Label>
                   <Input 
                     placeholder="e.g., 3.5-5.5"
                     value={results[test.testId]?.normalRange || ""}
@@ -252,9 +253,9 @@ function ResultModal({ ticketId, ticketName, tests, onClose }: ResultModalProps)
         </div>
 
         <div className="mt-6 flex justify-end gap-2">
-          <Button size="sm" variant="outline" onClick={onClose}>Cancel</Button>
+          <Button size="sm" variant="outline" onClick={onClose}>{tr("cancel")}</Button>
           <Button size="sm" onClick={submitResults} className="bg-green-600 text-white hover:bg-green-700">
-            Save Results
+            {tr("save_results")}
           </Button>
         </div>
       </div>
