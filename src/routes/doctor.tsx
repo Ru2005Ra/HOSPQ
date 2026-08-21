@@ -40,6 +40,7 @@ function Page() {
   const [showLabModal, setShowLabModal] = useState(false);
   const labCatalog = useDb((d) => d.labTests ?? []);
   const labResults = current?.labResults ?? [];
+  const labDocuments = current?.labDocuments ?? [];
 
   const exportPdf = () => {
     const doc = new jsPDF();
@@ -153,6 +154,28 @@ function Page() {
                           {result.result}{result.unit ? ` ${result.unit}` : ""}
                           {result.normalRange ? ` · Normal: ${result.normalRange}` : ""}
                         </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {labDocuments.length > 0 && (
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-6 shadow-[var(--shadow-card)]">
+                  <h3 className="text-lg font-semibold text-foreground">{tr("result_documents")}</h3>
+                  <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                    {labDocuments.map((document: any) => (
+                      <div key={document.id} className="rounded-lg border border-blue-200 bg-white p-3">
+                        {document.type.startsWith("image/") ? (
+                          <a href={document.dataUrl} target="_blank" rel="noreferrer" title={document.name}>
+                            <img src={document.dataUrl} alt={document.name} className="h-40 w-full rounded object-cover" />
+                          </a>
+                        ) : (
+                          <a href={document.dataUrl} target="_blank" rel="noreferrer" className="flex h-40 items-center justify-center rounded bg-secondary text-sm font-medium text-foreground hover:bg-secondary/80">
+                            {tr("open_document")}
+                          </a>
+                        )}
+                        <p className="mt-2 truncate text-xs text-muted-foreground" title={document.name}>{document.name}</p>
                       </div>
                     ))}
                   </div>
