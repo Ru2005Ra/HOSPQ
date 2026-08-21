@@ -873,11 +873,15 @@ export const db = {
       t.labRequestedTests = t.labRequestedTests.map(x => x.testId === result.testId ? { ...x, status: "done" } : x);
     }
 
-    const returnCode = t.returnDepartmentCode ?? t.departmentCode;
-    const returnDept = DEPARTMENTS.find(x => x.code === returnCode);
-    t.departmentCode = returnCode;
-    t.department = returnDept?.name ?? t.department;
-    t.status = t.assignedDoctorId ? "with-doctor" : "waiting";
+    const requestedTests = t.labRequestedTests ?? [];
+    const allRequestedTestsComplete = requestedTests.length > 0 && requestedTests.every(test => test.status === "done");
+    if (allRequestedTestsComplete) {
+      const returnCode = t.returnDepartmentCode ?? t.departmentCode;
+      const returnDept = DEPARTMENTS.find(x => x.code === returnCode);
+      t.departmentCode = returnCode;
+      t.department = returnDept?.name ?? t.department;
+      t.status = t.assignedDoctorId ? "with-doctor" : "waiting";
+    }
     write(d);
   },
 
@@ -922,7 +926,7 @@ export const db = {
     t.paymentConfirmed = paymentMethod === "mobile";
     t.paymentConfirmedBy = paymentMethod === "mobile" ? "Cashier" : null;
     t.paymentConfirmedAt = paymentMethod === "mobile" ? Date.now() : null;
-    t.status = paymentMethod === "cash" ? "pharmacy" : "removed";
+    t.status = "pharmacy";
     d.reports.push({
       id: uid(),
       userId: t.patientId,
