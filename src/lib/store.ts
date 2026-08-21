@@ -664,8 +664,8 @@ export const db = {
     const d = read();
     const doctors = d.users.filter(u => u.role === "doctor") as User[];
     const next = d.queue
-      .filter(t => t.status === "waiting" && t.receptionApproved === true && t.departmentCode !== "LB" && hasCompleteVitals(t.vitals))
-      .sort((a, b) => a.createdAt - b.createdAt)
+      .filter(t => t.status === "waiting" && t.receptionApproved === true && t.departmentCode !== "LB" && (hasCompleteVitals(t.vitals) || t.emergencyAlert?.active === true))
+      .sort((a, b) => Number(b.emergencyAlert?.active === true) - Number(a.emergencyAlert?.active === true) || a.createdAt - b.createdAt)
       .find(ticket => {
         const matching = doctors.filter(doc => (doc.departmentCodes ?? []).includes(ticket.departmentCode));
         return matching.length > 0;
@@ -693,8 +693,8 @@ export const db = {
     if (!doctor) return null;
 
     const next = d.queue
-      .filter(t => t.status === "waiting" && t.receptionApproved === true && t.departmentCode !== "LB" && hasCompleteVitals(t.vitals) && (doctor.departmentCodes ?? []).includes(t.departmentCode))
-      .sort((a, b) => a.createdAt - b.createdAt)[0];
+      .filter(t => t.status === "waiting" && t.receptionApproved === true && t.departmentCode !== "LB" && (hasCompleteVitals(t.vitals) || t.emergencyAlert?.active === true) && (doctor.departmentCodes ?? []).includes(t.departmentCode))
+      .sort((a, b) => Number(b.emergencyAlert?.active === true) - Number(a.emergencyAlert?.active === true) || a.createdAt - b.createdAt)[0];
 
     if (!next) return null;
     if (next.assignedDoctorId && next.assignedDoctorId !== doctorId) return null;
@@ -845,6 +845,10 @@ export const db = {
     t.departmentCode = t.departmentCode || "MH";
     t.department = DEPARTMENTS.find(x => x.code === t.departmentCode)?.name ?? t.department;
     t.status = "waiting";
+    t.receptionApproved = true;
+    t.assignedDoctorId = undefined;
+    t.assignedDoctorName = undefined;
+    t.calledAt = undefined;
     t.diagnosis = description;
     t.emergencyAlert = {
       departmentCode: t.departmentCode,
