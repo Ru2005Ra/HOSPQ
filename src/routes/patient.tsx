@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth, useDb, fmtDuration, fmtDurationWithSeconds } from "@/lib/hooks";
 import { calculatePatientPayable, db, DEPARTMENTS, hasCompleteVitals, type QueueTicket } from "@/lib/store";
 import { getProvinces, getDistricts, getSectors, getVillages } from "@/lib/locations";
-import { Clock3, Pill, Receipt, MapPin, CheckCheck, X, Loader2, CircleUserRound } from "lucide-react";
+import { Clock3, Pill, Receipt, MapPin, CheckCheck, X, Loader2, CircleUserRound, ArrowRight, Navigation, Sparkles } from "lucide-react";
 import { useT } from "@/lib/i18n";
 
 export const Route = createFileRoute("/patient")({
@@ -34,6 +34,8 @@ function PatientHome() {
   const emergencyNotice = useDb((d) => d.emergencyAlert ?? null);
   const [lastStatus, setLastStatus] = useState<string | null>(null);
   const [showPatientVisual, setShowPatientVisual] = useState(false);
+  const [guidanceOpen, setGuidanceOpen] = useState(false);
+  const [guidanceSeenStatus, setGuidanceSeenStatus] = useState<string | null>(null);
   const vitalsPending = !!ticket && !hasCompleteVitals(ticket.vitals);
 
   useEffect(() => {
@@ -85,15 +87,15 @@ function PatientHome() {
             <p className="mt-2 text-muted-foreground">{tr("manage_visit")}</p>
           </div>
           {showPatientVisual && (
-            <div className="patient-visual" aria-hidden="true">
-              <div className="patient-visual__glow" />
-              <div className="patient-visual__icon">
-                <CircleUserRound className="h-24 w-24" strokeWidth={1.35} />
-                <span className="patient-visual__smile" />
-              </div>
-              <span className="patient-visual__ring patient-visual__ring--one" />
-              <span className="patient-visual__ring patient-visual__ring--two" />
-            </div>
+            <PatientGuidance
+              ticket={ticket}
+              open={guidanceOpen}
+              isNew={guidanceSeenStatus !== ticket?.status}
+              onToggle={() => {
+                setGuidanceOpen(value => !value);
+                setGuidanceSeenStatus(ticket?.status ?? null);
+              }}
+            />
           )}
           <div className="patient-dashboard-content">
         {vitalsPending && (
@@ -118,6 +120,87 @@ function PatientHome() {
       </main>
     </div>
   );
+}
+
+function PatientGuidance({
+  ticket,
+  open,
+  isNew,
+  onToggle,
+}: {
+  ticket: QueueTicket | null;
+  open: boolean;
+  isNew: boolean;
+  onToggle: () => void;
+}) {
+  const guidance = getPatientGuidance(ticket);
+  if (!ticket) return null;
+
+  return (
+    <div className={`patient-visual ${isNew ? "patient-visual--new" : ""}`}>
+      <div className="patient-visual__glow" />
+      <button
+        type="button"
+        className="patient-visual__button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-label="Open visit guidance"
+      >
+        <CircleUserRound className="h-24 w-24" strokeWidth={1.35} />
+        <span className="patient-visual__smile" />
+        {isNew && <span className="patient-visual__new-dot" />}
+      </button>
+      <span className="patient-visual__ring patient-visual__ring--one" />
+      <span className="patient-visual__ring patient-visual__ring--two" />
+      {open && (
+        <div className="patient-guidance-panel" role="status">
+          <div className="patient-guidance-panel__heading">
+            <span className="patient-guidance-panel__eyebrow"><Sparkles className="h-3.5 w-3.5" /> Visit guide</span>
+            <button type="button" onClick={onToggle} className="patient-guidance-panel__close" aria-label="Close visit guidance"><X className="h-4 w-4" /></button>
+          </div>
+          <h2>{guidance.title}</h2>
+          <p>{guidance.message}</p>
+          <div className="patient-guidance-panel__location"><Navigation className="h-4 w-4" /><span>{guidance.location}</span></div>
+          {guidance.details.length > 0 && <ul>{guidance.details.map(detail => <li key={detail}>{detail}</li>)}</ul>}
+          {guidance.amount && <strong className="patient-guidance-panel__amount">{guidance.amount}</strong>}
+          {guidance.next && <div className="patient-guidance-panel__next"><ArrowRight className="h-4 w-4" /> {guidance.next}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function getPatientGuidance(ticket: QueueTicket | null) {
+  if (!ticket) return { title: "Visit guidance", message: "Your visit information will appear here.", location: "Hospital", details: [], amount: "", next: "" };
+  const room = DEPARTMENTS.find(department => department.code === ticket.departmentCode)?.room ?? "the assigned hospital room";
+  const doctor = ticket.assignedDoctorName ? `Dr. ${ticket.assignedDoctorName}` : "your assigned doctor";
+  const tests = ticket.labRequestedTests?.map(test => test.name) ?? [];
+
+  if (ticket.status === "waiting" && ticket.departmentCode === "LB") {
+    return {
+      title: "Laboratory tests required",
+      message: "Your doctor requested these tests before your visit can continue.",
+      location: "Lab section",
+      details: [...tests.map(test => `Test: ${test}`), ticket.diagnosis ? `Doctor's concern: ${ticket.diagnosis}` : "Follow the laboratory team's instructions."],
+      amount: "",
+      next: "After testing, return to your consultation area.",
+    };
+  }
+  if (ticket.status === "waiting" && ticket.assignedDoctorName) {
+    return { title: "Your doctor is ready soon", message: `Please stay near the consultation area for ${doctor}.`, location: room, details: ["Reception will call your token when it is your turn."], amount: "", next: "Next: doctor consultation" };
+  }
+  if (ticket.status === "with-doctor") {
+    return { title: "You are with the doctor", message: `${doctor} is reviewing your visit now.`, location: room, details: ["The doctor may send you to the laboratory if testing is needed.", "Your next step will appear here after the consultation."], amount: "", next: "Next: laboratory or payment" };
+  }
+  if (ticket.status === "paying") {
+    const total = (ticket.prescription ?? []).reduce((sum, item) => sum + (item.transfer ? 0 : item.price * item.qty), 0);
+    const payable = calculatePatientPayable(total, ticket.insurance);
+    return { title: "Payment required", message: "Please complete payment before collecting your medicines.", location: "Payment desk", details: ["You can pay by mobile money or cash.", `Insurance: ${ticket.insurance ?? "Cash"}`], amount: `Amount to pay: ${payable.toLocaleString()} RWF`, next: "Next: pharmacy" };
+  }
+  if (ticket.status === "pharmacy") {
+    return { title: "Collect your medicines", message: "Your payment is confirmed. Please go to the pharmacy counter.", location: "Pharmacy counter, near the main exit", details: ["Show your token to the pharmacy team."], amount: "", next: "Next: medicine collection" };
+  }
+  return { title: "Reception is processing your visit", message: "Please wait for your token to be called and keep your phone nearby.", location: room, details: ["Reception will record your vitals before you continue."], amount: "", next: "Next: doctor consultation" };
 }
 
 function StartVisit({ onVisitStarted }: { onVisitStarted: () => void }) {
