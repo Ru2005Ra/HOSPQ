@@ -116,7 +116,7 @@ function PatientHome() {
             <h1 className="text-3xl font-bold tracking-tight text-foreground">{tr("hi")} {user.firstName} 👋</h1>
             <p className="mt-2 text-muted-foreground">{tr("manage_visit")}</p>
           </div>
-          {showPatientVisual && (
+          {(showPatientVisual || !!ticket) && (
             <PatientGuidance
               ticket={ticket}
               emergency={emergencyNotice && emergencyNotice.departmentCode === ticket?.departmentCode ? emergencyNotice : null}

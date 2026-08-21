@@ -145,6 +145,14 @@
     border-color: var(--color-border);
   }
 
+  button:not(:disabled) {
+    transition: filter 150ms ease, transform 150ms ease;
+  }
+
+  button:not(:disabled):hover {
+    filter: saturate(1.12) brightness(0.96);
+  }
+
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
