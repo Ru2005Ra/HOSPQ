@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDb } from "@/lib/hooks";
-import { db, type Role } from "@/lib/store";
+import { db, DEPARTMENTS, type Role } from "@/lib/store";
 import { Trash2, Pencil, Download, Eye, EyeOff } from "lucide-react";
 import { useT } from "@/lib/i18n";
 
