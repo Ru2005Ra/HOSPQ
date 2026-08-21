@@ -265,6 +265,7 @@ function StaffTab() {
 function PatientsTab() {
   const tr = useT();
   const patients = useDb((d) => d.queue?.filter((t: any) => t.status === "done" || t.status === "removed") ?? []);
+  const emergencyPatients = useDb((d) => d.queue?.filter((t: any) => t.emergencyAlert) ?? []);
 
   const exportPdf = () => {
     const doc = new jsPDF();
@@ -312,6 +313,41 @@ function PatientsTab() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">{tr("emergency_patients")}</h2>
+            <p className="text-sm text-muted-foreground">{tr("emergency_patients_desc")}</p>
+          </div>
+          <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-semibold text-red-700">{emergencyPatients.length}</span>
+        </div>
+        <div className="overflow-hidden rounded-xl border border-red-200 bg-card shadow-[var(--shadow-card)]">
+          <table className="w-full text-sm">
+            <thead className="bg-red-50 text-left text-red-900">
+              <tr>
+                <th className="p-3">{tr("patient_col")}</th>
+                <th className="p-3">{tr("date_col")}</th>
+                <th className="p-3">{tr("department")}</th>
+                <th className="p-3">{tr("status")}</th>
+                <th className="p-3">{tr("emergency_reason")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {emergencyPatients.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">{tr("no_emergency_patients")}</td></tr>}
+              {emergencyPatients.map((patient: any) => (
+                <tr key={`emergency-${patient.id}`} className="border-t border-red-100">
+                  <td className="p-3 font-medium">{patient.patientName}</td>
+                  <td className="p-3 text-muted-foreground">{new Date(patient.emergencyAlert.startedAt ?? patient.createdAt).toLocaleDateString()}</td>
+                  <td className="p-3">{patient.department}</td>
+                  <td className="p-3">{patient.emergencyAlert.active ? tr("emergency_active_status") : tr("emergency_resolved_status")}</td>
+                  <td className="p-3 text-muted-foreground">{patient.emergencyAlert.description || patient.diagnosis || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
