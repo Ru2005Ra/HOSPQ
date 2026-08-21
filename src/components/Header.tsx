@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { Activity, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/hooks";
@@ -23,9 +23,12 @@ const ROLE_LABEL: Record<Role, TKey> = {
   manager: "role_manager_label",
 };
 
+const LAST_DASHBOARD_KEY = "hospiq_last_dashboard";
+
 export function Header() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const tr = useT();
   const lang = getLang();
 
@@ -60,7 +63,11 @@ export function Header() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => { db.logout(); navigate({ to: "/" }); }}
+                onClick={() => {
+                  localStorage.setItem(LAST_DASHBOARD_KEY, location.pathname);
+                  db.logout();
+                  navigate({ to: "/" });
+                }}
               >
                 <LogOut className="mr-1 h-4 w-4" /> {tr("logout")}
               </Button>

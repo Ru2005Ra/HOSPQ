@@ -639,7 +639,7 @@ export const db = {
     const d = read();
     const doctors = d.users.filter(u => u.role === "doctor") as User[];
     const next = d.queue
-      .filter(t => t.status === "waiting" && t.departmentCode !== "LB" && hasCompleteVitals(t.vitals))
+      .filter(t => t.status === "waiting" && t.receptionApproved === true && t.departmentCode !== "LB" && hasCompleteVitals(t.vitals))
       .sort((a, b) => a.createdAt - b.createdAt)
       .find(ticket => {
         const matching = doctors.filter(doc => (doc.departmentCodes ?? []).includes(ticket.departmentCode));
@@ -649,7 +649,9 @@ export const db = {
     if (!next) return null;
 
     const matching = doctors.filter(doc => (doc.departmentCodes ?? []).includes(next.departmentCode));
-    const assigned = matching[0] ?? doctors[0];
+    const assigned = matching[0];
+
+    if (!assigned) return null;
 
     next.status = "with-doctor";
     next.assignedDoctorId = assigned?.id;

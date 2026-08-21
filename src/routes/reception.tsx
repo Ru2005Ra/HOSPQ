@@ -7,7 +7,7 @@ import { Header } from "@/components/Header";
 import { RoleGuard } from "@/components/RoleGuard";
 import { Button } from "@/components/ui/button";
 import { useDb } from "@/lib/hooks";
-import { db } from "@/lib/store";
+import { db, DEPARTMENTS } from "@/lib/store";
 import { Download } from "lucide-react";
 import { useT } from "@/lib/i18n";
 
@@ -95,6 +95,7 @@ function Page() {
                 <th className="p-3">#</th>
                 <th className="p-3">{tr("patient_col")}</th>
                 <th className="p-3">{tr("department")}</th>
+                <th className="p-3">{tr("room")}</th>
                 <th className="p-3">{tr("location_col")}</th>
                 <th className="p-3">{tr("insurance_col")}</th>
                 <th className="p-3">{tr("vitals_col")}</th>
@@ -102,12 +103,13 @@ function Page() {
               </tr>
             </thead>
             <tbody>
-              {waiting.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">{tr("no_waiting")}</td></tr>}
+              {waiting.length === 0 && <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">{tr("no_waiting")}</td></tr>}
               {waiting.map((t: any) => (
                 <tr key={t.id} className="border-t border-border">
                   <td className="p-3 font-semibold text-primary">#{t.token}</td>
                   <td className="p-3">{t.patientName}</td>
                   <td className="p-3 text-muted-foreground">{t.department}</td>
+                  <td className="p-3 text-muted-foreground">{DEPARTMENTS.find(department => department.code === t.departmentCode)?.room ?? "—"}</td>
                   <td className="p-3 text-muted-foreground text-xs">{locationFor(t.patientId)}</td>
                   <td className="p-3 text-muted-foreground text-xs">{insuranceFor(t.patientId)}</td>
                   <td className="p-3 text-muted-foreground text-xs">{vitalsFor(t.id)}</td>

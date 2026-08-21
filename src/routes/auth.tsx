@@ -23,13 +23,18 @@ const ROLE_HOME: Record<Role, string> = {
   manager: "/manager",
 };
 
+const LAST_DASHBOARD_KEY = "hospiq_last_dashboard";
+
 function Auth() {
   const navigate = useNavigate();
   const tr = useT();
   const [mode, setMode] = useState<"login" | "register">("login");
 
   const handleLoginSuccess = (role: Role) => {
-    navigate({ to: ROLE_HOME[role] });
+    const lastDashboard = localStorage.getItem(LAST_DASHBOARD_KEY);
+    const destination = lastDashboard === ROLE_HOME[role] ? lastDashboard : ROLE_HOME[role];
+    localStorage.removeItem(LAST_DASHBOARD_KEY);
+    navigate({ to: destination });
   };
 
   return (
