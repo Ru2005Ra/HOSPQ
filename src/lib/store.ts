@@ -109,6 +109,8 @@ export interface QueueTicket {
   paymentConfirmedAt?: number | null;
   transfer?: boolean;
   transferDate?: number | null;
+  returnDoctorId?: string;
+  returnDoctorName?: string;
   dispensedAt?: number;
   returnDepartmentCode?: string;
   labRequestedTests?: RequestedLabTest[];
@@ -772,6 +774,8 @@ export const db = {
     t.stageToken = nextStageToken(d, "LB");
     t.stageStartedAt = Date.now();
     t.returnDepartmentCode = t.returnDepartmentCode ?? t.departmentCode;
+    t.returnDoctorId = doctorId;
+    t.returnDoctorName = `${doctor.firstName} ${doctor.lastName}`;
     t.departmentCode = "LB";
     t.department = "Laboratory";
     t.status = "waiting";
@@ -915,6 +919,10 @@ export const db = {
       const returnDept = DEPARTMENTS.find(x => x.code === returnCode);
       t.departmentCode = returnCode;
       t.department = returnDept?.name ?? t.department;
+      if (t.returnDoctorId) {
+        t.assignedDoctorId = t.returnDoctorId;
+        t.assignedDoctorName = t.returnDoctorName;
+      }
       t.status = t.assignedDoctorId ? "with-doctor" : "waiting";
     }
     write(d);
