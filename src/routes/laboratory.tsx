@@ -22,6 +22,11 @@ function LabPage() {
   const tr = useT();
   const queue = useDb((d) => d.queue?.filter((t: any) => t.departmentCode === "LB" && t.status !== "done" && t.status !== "removed") ?? []);
   const completed = useDb((d) => d.queue?.filter((t: any) => t.departmentCode === "LB" && t.status === "done") ?? []);
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayServices = useDb((d) => (d.queue ?? [])
+    .filter((ticket: any) => ticket.departmentCode === "LB" && ticket.createdAt >= todayStart.getTime())
+    .sort((a: any, b: any) => b.createdAt - a.createdAt));
   const [resultModal, setResultModal] = useState<{ ticketId: string; ticketName: string; tests: any[] } | null>(null);
 
   const exportPdf = () => {
@@ -95,6 +100,35 @@ function LabPage() {
             </tbody>
           </table>
         </div>
+
+        <section className="mt-10">
+          <h2 className="text-lg font-semibold text-foreground">{tr("today_patient_services")}</h2>
+          <div className="mt-3 overflow-x-auto rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
+            <table className="w-full text-sm">
+              <thead className="bg-secondary text-left text-muted-foreground">
+                <tr>
+                  <th className="p-3">{tr("patient_col")}</th>
+                  <th className="p-3">{tr("service_date")}</th>
+                  <th className="p-3">{tr("service_time")}</th>
+                  <th className="p-3">{tr("department")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {todayServices.length === 0 && (
+                  <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">{tr("no_services_today")}</td></tr>
+                )}
+                {todayServices.map((ticket: any) => (
+                  <tr key={`lab-service-${ticket.id}`} className="border-t border-border">
+                    <td className="p-3 font-medium">{ticket.patientName}</td>
+                    <td className="p-3 text-muted-foreground">{new Date(ticket.createdAt).toLocaleDateString()}</td>
+                    <td className="p-3 text-muted-foreground">{new Date(ticket.createdAt).toLocaleTimeString()}</td>
+                    <td className="p-3">{ticket.department || tr("lab_title")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
         {resultModal && <ResultModal {...resultModal} onClose={() => setResultModal(null)} />}
       </main>
