@@ -88,6 +88,7 @@ export interface QueueTicket {
   createdAt: number;
   status: "waiting" | "with-doctor" | "paying" | "pharmacy" | "done" | "removed";
   receptionApproved?: boolean;
+  resumeAfterLogout?: boolean;
 
   // Assigned doctor for the consultation.
   assignedDoctorId?: string;
@@ -281,6 +282,7 @@ function pruneExpiredWaitingTickets(data: DB): DB {
   const next = { ...data, queue: [...(data.queue ?? [])] };
   next.queue = next.queue.filter((ticket) => {
     if (ticket.status !== "waiting") return true;
+    if (ticket.resumeAfterLogout === true) return true;
     const peopleAhead = next.queue.filter((item) => item.status === "waiting" && item.createdAt < ticket.createdAt).length;
     const waitWindowMs = peopleAhead * 5 * 60 * 1000;
     const graceWindowMs = 60 * 1000;
@@ -584,6 +586,13 @@ export const db = {
     if (s) {
       const u = d.users.find(x => x.id === s.userId);
       if (u) {
+        if (u.role === "patient") {
+          d.queue.forEach(ticket => {
+            if (ticket.patientId === u.id && ticket.status !== "done" && ticket.status !== "removed") {
+              ticket.resumeAfterLogout = true;
+            }
+          });
+        }
         const open = [...d.attendance].reverse().find(a => a.doctorId === u.id && !a.logoutAt);
         if (open) open.logoutAt = Date.now();
       }
