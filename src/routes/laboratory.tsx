@@ -102,6 +102,41 @@ function LabPage() {
   );
 }
 
+function UploadLabDocument({ ticketId, onUploaded }: { ticketId: string; onUploaded?: () => void }) {
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result ?? "");
+      db.uploadLabDocument(ticketId, {
+        name: file.name,
+        type: file.type || "application/octet-stream",
+        dataUrl,
+      });
+      setUploading(false);
+      onUploaded?.();
+      toast.success("Document uploaded successfully");
+      event.target.value = "";
+    };
+    reader.onerror = () => {
+      setUploading(false);
+      toast.error("Unable to upload the file");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-border bg-secondary px-3 py-2 text-xs text-muted-foreground hover:bg-secondary/80">
+      <input type="file" accept="image/*,.pdf,.doc,.docx" onChange={handleUpload} className="hidden" />
+      {uploading ? "Uploading..." : "Import image/document"}
+    </label>
+  );
+}
+
 interface ResultModalProps {
   ticketId: string;
   ticketName: string;
@@ -112,6 +147,15 @@ interface ResultModalProps {
 function ResultModal({ ticketId, ticketName, tests, onClose }: ResultModalProps) {
   const tr = useT();
   const [results, setResults] = useState<{ [testId: string]: { result: string; unit: string; normalRange: string } }>({});
+  const [documents, setDocuments] = useState<any[]>(() => {
+    const ticket = db.all().queue.find((item: any) => item.id === ticketId);
+    return ticket?.labDocuments ?? [];
+  });
+
+  const refreshDocuments = () => {
+    const ticket = db.all().queue.find((item: any) => item.id === ticketId);
+    setDocuments(ticket?.labDocuments ?? []);
+  };
 
   const handleResultChange = (testId: string, field: string, value: string) => {
     setResults(prev => ({
@@ -141,9 +185,34 @@ function ResultModal({ ticketId, ticketName, tests, onClose }: ResultModalProps)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-2xl rounded-xl bg-card p-6 shadow-lg max-h-96 overflow-y-auto">
+      <div className="w-full max-w-2xl rounded-xl bg-card p-6 shadow-lg max-h-[90vh] overflow-y-auto">
         <h2 className="text-lg font-semibold mb-2">Enter Lab Results</h2>
         <p className="text-sm text-muted-foreground mb-4">{ticketName}</p>
+
+        <div className="mb-5 rounded-lg border border-dashed border-border bg-secondary/30 p-3">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <p className="text-sm font-medium">Test result images / documents</p>
+            <UploadLabDocument ticketId={ticketId} onUploaded={refreshDocuments} />
+          </div>
+          {documents.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No images or documents uploaded yet.</p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {documents.map((doc: any) => (
+                <div key={doc.id} className="rounded-md border border-border bg-background p-2">
+                  {doc.type.startsWith("image/") ? (
+                    <img src={doc.dataUrl} alt={doc.name} className="h-28 w-full rounded object-cover" />
+                  ) : (
+                    <a href={doc.dataUrl} target="_blank" rel="noreferrer" className="flex h-28 items-center justify-center rounded bg-secondary text-xs font-medium text-foreground">
+                      Open document
+                    </a>
+                  )}
+                  <p className="mt-2 truncate text-[11px] text-muted-foreground">{doc.name}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         
         <div className="space-y-4">
           {tests.map((test: any) => (

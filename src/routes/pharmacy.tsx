@@ -69,16 +69,20 @@ function DispenseTab() {
                   {(t.prescription ?? []).map((p: any) => `${p.name}×${p.qty}`).join(", ") || "—"}
                 </td>
                 <td className="p-3">
-                  {t.paid
-                    ? <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700">✅ Paid — {t.paidAmount?.toLocaleString()} RWF</span>
-                    : <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-700">❌ {tr("unpaid")}</span>
-                  }
+                  {t.paid ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700">✅ {t.paymentMethod === "cash" ? `Cash paid` : `Paid`} — {t.paidAmount?.toLocaleString()} RWF</span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-700">❌ {tr("unpaid")}</span>
+                  )}
                 </td>
                 <td className="p-3 text-right">
-                  {t.paid
-                    ? <Button size="sm" onClick={() => { db.dispense(t.id); toast.success(tr("dispensed")); }} className="bg-accent text-accent-foreground hover:bg-accent/90">{tr("dispense")}</Button>
-                    : <span className="text-xs text-muted-foreground italic">Awaiting payment</span>
-                  }
+                  {t.paymentMethod === "cash" && !t.paymentConfirmed ? (
+                    <Button size="sm" onClick={() => { db.confirmCashPayment(t.id, (db.currentUser() ?? { id: "pharmacy-user" }).id); toast.success("Cash payment confirmed"); }} className="bg-amber-600 text-white hover:bg-amber-700">Confirm cash</Button>
+                  ) : t.paid ? (
+                    <Button size="sm" onClick={() => { db.dispense(t.id); toast.success(tr("dispensed")); }} className="bg-accent text-accent-foreground hover:bg-accent/90">{tr("dispense")}</Button>
+                  ) : (
+                    <span className="text-xs text-muted-foreground italic">Awaiting payment</span>
+                  )}
                 </td>
               </tr>
             ))}

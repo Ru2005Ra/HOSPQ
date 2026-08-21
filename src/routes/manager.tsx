@@ -58,10 +58,12 @@ function Page() {
           <TabsList>
             <TabsTrigger value="staff">Staff Management</TabsTrigger>
             <TabsTrigger value="patients">Patients Report</TabsTrigger>
+            <TabsTrigger value="doctor-work">Doctor Daily Work</TabsTrigger>
             <TabsTrigger value="attendance">{tr("attendance_tab")}</TabsTrigger>
           </TabsList>
           <TabsContent value="staff" className="mt-6"><StaffTab /></TabsContent>
           <TabsContent value="patients" className="mt-6"><PatientsTab /></TabsContent>
+          <TabsContent value="doctor-work" className="mt-6"><DoctorWorkTab /></TabsContent>
           <TabsContent value="attendance" className="mt-6"><AttendanceTab /></TabsContent>
         </Tabs>
       </main>
@@ -305,6 +307,74 @@ function PatientsTab() {
                 <td className="p-3">{p.department}</td>
                 <td className="p-3">{p.insurance ?? "Cash"}</td>
                 <td className="p-3">{p.status}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function DoctorWorkTab() {
+  const doctorWork = useDb((d) => {
+    const map = new Map<string, { doctorId: string; doctorName: string; date: string; total: number; patients: string[]; departments: string[]; transfers: { patient: string; date: string }[] }>();
+
+    for (const ticket of d.queue ?? []) {
+      if (!ticket.assignedDoctorId) continue;
+      const doctor = d.users.find((u: any) => u.id === ticket.assignedDoctorId && u.role === "doctor");
+      if (!doctor) continue;
+      const key = `${ticket.assignedDoctorId}:${new Date(ticket.createdAt).toISOString().slice(0, 10)}`;
+      const row = map.get(key) ?? { doctorId: ticket.assignedDoctorId, doctorName: `${doctor.firstName} ${doctor.lastName}`, date: new Date(ticket.createdAt).toISOString().slice(0, 10), total: 0, patients: [], departments: [], transfers: [] };
+      row.total += 1;
+      row.patients.push(ticket.patientName);
+      row.departments.push(ticket.department);
+      const hasTransfer = (ticket.prescription ?? []).some((item: any) => item.transfer);
+      if (hasTransfer) {
+        row.transfers.push({ patient: ticket.patientName, date: ticket.transferDate ? new Date(ticket.transferDate).toLocaleDateString() : "Not recorded"});
+      }
+      map.set(key, row);
+    }
+
+    return [...map.values()].sort((a, b) => b.date.localeCompare(a.date) || a.doctorName.localeCompare(b.doctorName));
+  });
+
+  return (
+    <div className="grid gap-4">
+      <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)] overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-secondary text-left text-muted-foreground">
+            <tr>
+              <th className="p-3">Doctor</th>
+              <th className="p-3">Date</th>
+              <th className="p-3">Total patients</th>
+              <th className="p-3">Patients</th>
+              <th className="p-3">Department</th>
+              <th className="p-3">Transfer</th>
+            </tr>
+          </thead>
+          <tbody>
+            {doctorWork.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No daily doctor work recorded yet.</td></tr>}
+            {doctorWork.map((row) => (
+              <tr key={`${row.doctorId}-${row.date}`} className="border-t border-border align-top">
+                <td className="p-3 font-medium">{row.doctorName}</td>
+                <td className="p-3 text-muted-foreground">{new Date(row.date).toLocaleDateString()}</td>
+                <td className="p-3 font-semibold text-primary">{row.total}</td>
+                <td className="p-3 text-xs text-muted-foreground">{row.patients.join(", ") || "—"}</td>
+                <td className="p-3 text-xs text-muted-foreground">{Array.from(new Set(row.departments)).join(", ") || "—"}</td>
+                <td className="p-3 text-xs">
+                  {row.transfers.length === 0 ? (
+                    <span className="rounded-full bg-green-100 px-2 py-1 text-green-700">No</span>
+                  ) : (
+                    <div className="space-y-1">
+                      {row.transfers.map((item, idx) => (
+                        <div key={`${item.patient}-${idx}`} className="rounded bg-orange-50 px-2 py-1 text-orange-700">
+                          {item.patient} — Yes ({item.date})
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

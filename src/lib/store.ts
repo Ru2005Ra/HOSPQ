@@ -68,6 +68,14 @@ export interface RequestedLabTest {
   requestedByDoctorName?: string;
 }
 
+export interface LabDocument {
+  id: string;
+  name: string;
+  type: string;
+  dataUrl: string;
+  uploadedAt: number;
+}
+
 export interface QueueTicket {
   id: string;
   patientId: string;
@@ -89,10 +97,17 @@ export interface QueueTicket {
   doctorNote?: string;
   paid?: boolean;
   paidAmount?: number;
+  paymentMethod?: "mobile" | "cash";
+  paymentConfirmed?: boolean;
+  paymentConfirmedBy?: string | null;
+  paymentConfirmedAt?: number | null;
+  transfer?: boolean;
+  transferDate?: number | null;
   dispensedAt?: number;
   returnDepartmentCode?: string;
   labRequestedTests?: RequestedLabTest[];
   labResults?: LabTestResult[];
+  labDocuments?: LabDocument[];
   emergencyAlert?: { departmentCode: string; description: string; active: boolean; startedAt: number } | null;
 }
 
@@ -255,6 +270,13 @@ function read(): DB {
 }
 
 function write(db: DB) {
+  db.medicines = db.medicines.filter((m) => m.stock > 0);
+  db.queue = db.queue.map((ticket) => {
+    if (ticket.transfer && !ticket.transferDate) {
+      ticket.transferDate = Date.now();
+    }
+    return ticket;
+  });
   localStorage.setItem(KEY, JSON.stringify(db));
   syncDbToSupabase(db);
   if (API_URL && typeof window !== "undefined") {
@@ -628,9 +650,12 @@ export const db = {
     const d = read();
     const t = d.queue.find(x => x.id === ticketId);
     if (!t) return;
+    const hasTransfer = (payload.prescription ?? []).some(item => item.transfer === true);
     t.diagnosis = payload.diagnosis;
     t.prescription = payload.prescription;
     t.doctorNote = payload.doctorNote;
+    t.transfer = hasTransfer;
+    t.transferDate = hasTransfer ? (t.transferDate ?? Date.now()) : null;
     t.status = "paying";
     write(d);
   },
@@ -818,32 +843,60 @@ export const db = {
     ticket.assignedDoctorName = `${doctor.firstName} ${doctor.lastName}`;
     write(d);
   },
-  recordPayment(ticketId: string, amount: number) {
+  recordPayment(ticketId: string, amount: number, paymentMethod: "mobile" | "cash" = "mobile") {
     const d = read();
     const t = d.queue.find(x => x.id === ticketId);
     if (!t) return;
     t.paid = true;
     t.paidAmount = amount;
-    t.status = "removed";
+    t.paymentMethod = paymentMethod;
+    t.paymentConfirmed = paymentMethod === "mobile";
+    t.paymentConfirmedBy = paymentMethod === "mobile" ? "Cashier" : null;
+    t.paymentConfirmedAt = paymentMethod === "mobile" ? Date.now() : null;
+    t.status = paymentMethod === "cash" ? "pharmacy" : "removed";
     d.reports.push({
       id: uid(),
       userId: t.patientId,
       role: "patient",
-      content: `Patient ${t.patientName} was served in ${t.department} on ${new Date().toLocaleDateString()}. Insurance: ${t.insurance ?? "Cash"}. Amount paid: ${amount} RWF.`,
+      content: `Patient ${t.patientName} was served in ${t.department} on ${new Date().toLocaleDateString()}. Insurance: ${t.insurance ?? "Cash"}. Amount paid: ${amount} RWF via ${paymentMethod}.`,
       createdAt: Date.now(),
     });
+    write(d);
+  },
+  confirmCashPayment(ticketId: string, userId: string) {
+    const d = read();
+    const t = d.queue.find(x => x.id === ticketId);
+    const staff = d.users.find(x => x.id === userId && (x.role === "doctor" || x.role === "storekeeper"));
+    if (!t || !staff) return;
+    if (t.paymentMethod !== "cash") return;
+    t.paymentConfirmed = true;
+    t.paymentConfirmedBy = `${staff.firstName} ${staff.lastName}`;
+    t.paymentConfirmedAt = Date.now();
+    t.status = "pharmacy";
+    write(d);
+  },
+  uploadLabDocument(ticketId: string, doc: Omit<LabDocument, "id" | "uploadedAt">) {
+    const d = read();
+    const t = d.queue.find(x => x.id === ticketId);
+    if (!t) return;
+    const document: LabDocument = {
+      id: uid(),
+      ...doc,
+      uploadedAt: Date.now(),
+    };
+    t.labDocuments = [...(t.labDocuments ?? []), document];
     write(d);
   },
   dispense(ticketId: string) {
     const d = read();
     const t = d.queue.find(x => x.id === ticketId);
     if (!t) return;
-   //stoke infor
     for (const p of t.prescription ?? []) {
       if (p.transfer) continue;
       const m = d.medicines.find(m => m.id === p.medicineId);
       if (m) m.stock = Math.max(0, m.stock - p.qty);
     }
+    d.medicines = d.medicines.filter((m) => m.stock > 0);
     t.dispensedAt = Date.now();
     t.status = "done";
     write(d);

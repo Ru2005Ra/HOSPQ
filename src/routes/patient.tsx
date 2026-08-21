@@ -380,6 +380,7 @@ function PaymentPanel({ ticketId }: { ticketId: string }) {
   const ticket = useDb((d) => d.queue?.find((t: any) => t.id === ticketId) ?? null);
   const [phone, setPhone] = useState(user?.phone?.replace("+250", "") ?? "");
   const [confirmed, setConfirmed] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"mobile" | "cash">("mobile");
 
   if (!ticket) return null;
   const total = (ticket.prescription ?? []).reduce((s: number, p: any) => s + (p.transfer ? 0 : p.price * p.qty), 0);
@@ -388,9 +389,11 @@ function PaymentPanel({ ticketId }: { ticketId: string }) {
 
   const pay = (e: React.FormEvent) => {
     e.preventDefault();
-    if (`+250${phone}` !== user?.phone) return toast.error(tr("phone_mismatch"));
-    db.recordPayment(ticketId, patientPayable);
-    toast.success(`Payment confirmed: ${patientPayable.toLocaleString()} RWF. Head to the pharmacy counter.`);
+    if (paymentMethod === "mobile") {
+      if (`+250${phone}` !== user?.phone) return toast.error(tr("phone_mismatch"));
+    }
+    db.recordPayment(ticketId, patientPayable, paymentMethod);
+    toast.success(`Payment confirmed: ${patientPayable.toLocaleString()} RWF via ${paymentMethod === "mobile" ? "mobile money" : "cash"}.`);
   };
 
   return (
@@ -440,34 +443,53 @@ function PaymentPanel({ ticketId }: { ticketId: string }) {
         </div>
       </div>
 
-      {/* Pay by Mobile Money Card */}
+      {/* Pay by Mobile Money / Cash Card */}
       {total > 0 && (
         <form onSubmit={pay} className="rounded-xl border-2 border-accent bg-card p-6 shadow-[var(--shadow-card)]">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-lg">💳</span>
             <h3 className="text-lg font-semibold text-foreground">{tr("pay_mobile")}</h3>
           </div>
-          <p className="text-sm text-muted-foreground mb-5">
-            Enter your registered phone number to confirm payment of <strong>{patientPayable.toLocaleString()} RWF</strong>.
-          </p>
 
-          {/* Phone Input */}
-          <div className="flex gap-2 mb-4">
-            <div className="flex items-center rounded-md border border-input bg-secondary px-3 text-sm font-medium text-foreground whitespace-nowrap">
-              +250
-            </div>
-            <Input
-              required
-              inputMode="numeric"
-              maxLength={9}
-              placeholder="78xxxxxxx"
-              value={phone}
-              onChange={e => setPhone(e.target.value.replace(/\D/g, ""))}
-              className="flex-1"
-            />
+          <div className="mb-4 grid gap-2 sm:grid-cols-2">
+            <label className={`rounded-lg border p-3 cursor-pointer ${paymentMethod === "mobile" ? "border-accent bg-accent/5" : "border-border bg-secondary"}`}>
+              <input type="radio" name="paymentMethod" checked={paymentMethod === "mobile"} onChange={() => setPaymentMethod("mobile")} className="mr-2" />
+              Mobile money
+            </label>
+            <label className={`rounded-lg border p-3 cursor-pointer ${paymentMethod === "cash" ? "border-accent bg-accent/5" : "border-border bg-secondary"}`}>
+              <input type="radio" name="paymentMethod" checked={paymentMethod === "cash"} onChange={() => setPaymentMethod("cash")} className="mr-2" />
+              Cash at pharmacy
+            </label>
           </div>
 
-          {/* Confirmation Checkbox */}
+          {paymentMethod === "mobile" && (
+            <>
+              <p className="text-sm text-muted-foreground mb-5">
+                Enter your registered phone number to confirm payment of <strong>{patientPayable.toLocaleString()} RWF</strong>.
+              </p>
+              <div className="flex gap-2 mb-4">
+                <div className="flex items-center rounded-md border border-input bg-secondary px-3 text-sm font-medium text-foreground whitespace-nowrap">
+                  +250
+                </div>
+                <Input
+                  required
+                  inputMode="numeric"
+                  maxLength={9}
+                  placeholder="78xxxxxxx"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value.replace(/\D/g, ""))}
+                  className="flex-1"
+                />
+              </div>
+            </>
+          )}
+
+          {paymentMethod === "cash" && (
+            <p className="text-sm text-muted-foreground mb-5">
+              You will pay <strong>{patientPayable.toLocaleString()} RWF</strong> in cash at the pharmacy counter. The pharmacy staff will confirm it on their dashboard.
+            </p>
+          )}
+
           <div className="flex items-start gap-3 mb-5">
             <input
               type="checkbox"
@@ -481,19 +503,18 @@ function PaymentPanel({ ticketId }: { ticketId: string }) {
             </label>
           </div>
 
-          {/* Pay Button */}
           <Button
             type="submit"
-            disabled={!confirmed || phone.length !== 9}
+            disabled={!confirmed || (paymentMethod === "mobile" && phone.length !== 9)}
             className="w-full bg-accent text-accent-foreground hover:bg-accent/90 disabled:opacity-50 font-semibold py-2"
           >
-            Pay {patientPayable.toLocaleString()} RWF
+            {paymentMethod === "cash" ? `Confirm cash payment of ${patientPayable.toLocaleString()} RWF` : `Pay ${patientPayable.toLocaleString()} RWF`}
           </Button>
         </form>
       )}
 
       {total === 0 && (
-        <Button onClick={() => db.recordPayment(ticketId, 0)} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
+        <Button onClick={() => db.recordPayment(ticketId, 0, "cash")} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
           Proceed to Pharmacy →
         </Button>
       )}
